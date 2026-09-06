@@ -314,16 +314,18 @@ fa06b38 feat(runtime): add tool interface, per-instance registry, role ACL and c
 77822a3 feat(runtime): add AgentRuntime compositing the original agent loop
 809abca refactor(agent): add optional runtime integration hooks to the agent loop
 c012033 test(runtime): add 59 runtime unit tests
-（docs commit 见下方追加）
+da355e6 docs(phase-01): record runtime refactor results and README usage
+0492b27 feat(phase-01): merge agent runtime refactor into repopilot-dev
 
 Remote:
 none（本地仓库无 origin 配置）
 
 Push Status:
-BLOCKED — 无 GitHub 凭据，按规约第 8 条记录为 IMPLEMENTED_BUT_PUSH_BLOCKED。
+BLOCKED — 无 GitHub 凭据（无 gh CLI、无 credential helper、无 SSH key），
+无法完成 git push。按规约第 8 条记录为 IMPLEMENTED_BUT_PUSH_BLOCKED。
 
 Integration:
-见下方合并记录
+已合并入 repopilot-dev（merge commit 0492b27），合并后回归 72/72 PASS
 ```
 
 ### 10. 当前模块最终实现能力
