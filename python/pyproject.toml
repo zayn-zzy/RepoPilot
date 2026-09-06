@@ -12,6 +12,10 @@ dependencies = [
     "anthropic>=0.40.0",
     "openai>=1.50.0",
     "rich>=13.0.0",
+    # RepoPilot repository intelligence (Phase 2+)
+    "tree-sitter>=0.24",
+    "tree-sitter-python>=0.23",
+    "networkx>=3.0",
 ]
 
 [project.scripts]
