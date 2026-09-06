@@ -121,7 +121,8 @@ chore/phase-00-baseline
 
 Commits:
 7e5d079 chore: import original claude-code-from-scratch codebase as RepoPilot baseline
-（Phase 0 文档提交见下方追加记录）
+a4e6480 docs(phase-00): add original architecture analysis and development results record
+331917e chore(phase-00): merge baseline analysis into repopilot-dev
 
 Remote:
 none（本地仓库无 origin 配置）
@@ -131,7 +132,7 @@ BLOCKED — 无 GitHub 凭据（无 gh CLI、无 credential helper、无 SSH key
 无法完成 git push。按规约第 8 条记录为 IMPLEMENTED_BUT_PUSH_BLOCKED。
 
 Integration:
-已合并入 repopilot-dev（本地）
+已合并入 repopilot-dev（本地，merge commit 331917e），合并后回归 13/13 PASS
 ```
 
 ### 10. 当前模块最终实现能力
