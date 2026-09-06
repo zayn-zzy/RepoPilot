@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Callable
 
 from .memory import get_memory_dir
 from .frontmatter import parse_frontmatter
@@ -179,14 +180,21 @@ def reset_activated_tools() -> None:
     _activated_tools.clear()
 
 
-def get_active_tool_definitions(all_tools: list[ToolDef] | None = None) -> list[ToolDef]:
+def get_active_tool_definitions(
+    all_tools: list[ToolDef] | None = None,
+    *,
+    activated: set[str] | None = None,
+) -> list[ToolDef]:
     """Return tool definitions, excluding deferred tools that haven't been activated.
-    Strips the 'deferred' key so it's not sent to the API."""
+    Strips the 'deferred' key so it's not sent to the API. `activated` overrides the
+    module-level set — AgentRuntime passes its per-instance registry set so deferred
+    activation no longer leaks across agents."""
     tools = all_tools if all_tools is not None else tool_definitions
+    active = _activated_tools if activated is None else activated
     return [
         {k: v for k, v in t.items() if k != "deferred"}
         for t in tools
-        if not t.get("deferred") or t["name"] in _activated_tools
+        if not t.get("deferred") or t["name"] in active
     ]
 
 
@@ -666,6 +674,19 @@ def _truncate_result(result: str) -> str:
 # ─── Execute a tool call ────────────────────────────────────
 # "agent" and "skill" tools are handled in agent.py to avoid circular deps.
 
+# Built-in handler table — shared with the runtime ToolRegistry so registered
+# built-ins dispatch through the original executor (read-before-edit, mtime
+# bookkeeping) unchanged.
+BUILTIN_TOOL_HANDLERS: dict[str, Callable[[dict], str]] = {
+    "read_file": _read_file,
+    "write_file": _write_file,
+    "edit_file": _edit_file,
+    "list_files": _list_files,
+    "grep_search": _grep_search,
+    "run_shell": _run_shell,
+    "web_fetch": _web_fetch,
+}
+
 
 async def execute_tool(
     name: str, inp: dict, read_file_state: dict[str, float] | None = None
@@ -711,15 +732,7 @@ async def execute_tool(
             indent=2,
         )
 
-    handlers: dict = {
-        "write_file": _write_file,
-        "edit_file": _edit_file,
-        "list_files": _list_files,
-        "grep_search": _grep_search,
-        "run_shell": _run_shell,
-        "web_fetch": _web_fetch,
-    }
-    handler = handlers.get(name)
+    handler = BUILTIN_TOOL_HANDLERS.get(name)
     if not handler:
         return f"Unknown tool: {name}"
     result = handler(inp)

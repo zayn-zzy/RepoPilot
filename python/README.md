@@ -39,6 +39,25 @@ OPENAI_API_KEY=sk-xxx mini-claude-py --api-base https://api.openai.com/v1 --mode
 | `skills.py` | `skills.ts` | 技能系统 |
 | `subagent.py` | `subagent.ts` | 子 Agent |
 | `frontmatter.py` | `frontmatter.ts` | YAML frontmatter 解析 |
+| `runtime/` | —（RepoPilot 新增） | 多角色 Agent Runtime（见下） |
+
+## RepoPilot Agent Runtime（Phase 1）
+
+`mini_claude/runtime/` 将原 CLI Agent 包装为**可实例化多个角色的通用运行时**：
+
+```python
+from mini_claude.runtime import AgentRuntime, AgentConfig
+
+planner = AgentRuntime(AgentConfig.from_role("planner", api_key="..."))
+result = await planner.run("分析这个仓库的结构")  # -> RunResult
+```
+
+每个实例独立拥有：ToolRegistry（工具注册/分发/延迟激活）、ToolACL（角色级
+只读/工具白名单）、Budget（成本/轮次）、Context（对话历史视图）、
+EventEmitter + Trace（7 类规范事件与指标聚合）。内置角色档案：
+planner / explorer / reviewer（只读）、coder（读写）、tester（读 + shell）、
+general（全部工具）。Agent Loop 本体（流式、压缩、权限、子 Agent）未改动，
+CLI 行为与原来一致。
 
 ## 依赖
 

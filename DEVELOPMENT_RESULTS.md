@@ -13,7 +13,7 @@ Last Updated: 2026-09-06
 | Phase | Module | Branch | Status | Tests | Remote Push |
 |------|------|------|------|------|------|
 | 0 | Baseline 理解 | chore/phase-00-baseline | COMPLETED（Push BLOCKED，见下） | 13/13 PASS | BLOCKED（无凭据） |
-| 1 | Agent Runtime | feat/phase-01-agent-runtime | IN_PROGRESS | - | - |
+| 1 | Agent Runtime | feat/phase-01-agent-runtime | COMPLETED（Push BLOCKED） | 72/72 PASS | BLOCKED（无凭据） |
 
 ---
 
@@ -168,4 +168,196 @@ Integration:
 
 ## Phase 1：Agent Runtime 重构
 
-（开发完成后填写）
+### 1. 开发目标
+
+原始项目只有一个面向 CLI 的 `Agent` 类：11 个构造参数、职责过载（LLM 适配、
+工具注册、权限、预算、压缩、子 Agent 全部堆在 1951 行一个类里），工具激活状态
+与权限规则缓存是模块级全局变量，多实例共享、互相污染。Phase 1 将其重构为
+**可实例化多个角色的通用 Agent Runtime**，为 Phase 5 的 Multi-Agent（Planner /
+Explorer / Coder / Tester / Reviewer）打地基：每个角色 = 独立配置 + 独立工具
+注册表 + 独立 ACL + 独立预算 + 独立上下文 + 独立事件流。
+
+### 2. 实现内容
+
+新增 `mini_claude/runtime/` 包（10 个模块，约 700 行）：
+
+- **ToolRegistry**：每实例工具注册表，注册/注销/查询/定义渲染/dispatch；
+  deferred 工具（enter/exit_plan_mode）的激活状态从模块全局迁入实例级集合，
+  修复多实例激活泄漏。
+- **Tool 基类接口**：`Tool` dataclass（name/description/input_schema/handler/
+  read_only/concurrency_safe/deferred）+ `to_definition()` 渲染 Anthropic 协议
+  字典；`tool_from_definition()` 适配器桥接原有 dict 定义。
+- **LLMProvider**：后端选择（anthropic/openai）+ 模型能力元数据（context
+  window / max output tokens / thinking 支持），`from_config()` 映射
+  AgentConfig → Agent 构造参数。
+- **AgentConfig**：收敛原 11 个构造参数为带校验的 dataclass（model/权限模式/
+  预算/工具集/只读等 13 项规则校验）；`from_role()` 提供 5 个角色档案。
+- **ToolACL**：角色级权限层（read_only / allowed_tools / denied_tools），叠加
+  在原有 `check_permission` 静态引擎之上；`filter_definitions()` 保证模型永远
+  看不到无权使用的工具。
+- **Budget**：从 Agent 内联字段抽出的预算对象（同成本公式：$3/M in、0.1x
+  cache read、1.25x cache write、$15/M out），record_tokens/check 接口。
+- **Context 接口**：后端无关的对话历史视图（Protocol + AgentContext 适配器），
+  存储仍复用 Agent 双消息列表。
+- **统一 Event + 基础 Trace**：`EventEmitter`（订阅/退订/emit，监听器异常
+  隔离）+ 7 种规范事件（run_started/run_finished/llm_request/tool_call/
+  tool_result/permission_denied/budget_exceeded）+ `Trace`（时间戳记录 +
+  metrics 聚合：llm_calls/tool_calls/denials/tokens/cost/runtime）。
+- **AgentRuntime**：组合以上全部；`AgentRuntime(AgentConfig)` 即可得到独立
+  运行的 role agent（`planner = AgentRuntime(...)` / `explorer =
+  AgentRuntime(...)`），`run(prompt) -> RunResult`。
+
+对原有代码只做外科手术式修改（约 30 行 diff 进 agent.py）：Agent 增加三个
+可选挂接点（`_event_emit` / `_tool_dispatcher` / `_active_tool_set`，默认
+None → CLI 路径行为完全不变），在工具调用/结果/拒绝/预算超限/LLM 请求处
+埋入 `_emit_event`；tools.py 暴露 `BUILTIN_TOOL_HANDLERS` 并让
+`get_active_tool_definitions` 接受实例级激活集合。**Agent Loop 本体（流式、
+重试、压缩、计划模式、子 Agent、read-before-edit）一行未改。**
+
+### 3. 新增文件
+
+| 文件 | 作用 |
+|------|------|
+| `python/mini_claude/runtime/events.py` | EventEmitter + 规范事件名 |
+| `python/mini_claude/runtime/trace.py` | Trace 事件日志 + metrics 聚合 |
+| `python/mini_claude/runtime/budget.py` | Budget / BudgetStatus |
+| `python/mini_claude/runtime/config.py` | AgentConfig + 校验 + 角色档案 |
+| `python/mini_claude/runtime/provider.py` | LLMProvider 后端/能力抽象 |
+| `python/mini_claude/runtime/tools.py` | Tool 基类接口 + 适配器 |
+| `python/mini_claude/runtime/registry.py` | ToolRegistry + build_default_registry |
+| `python/mini_claude/runtime/permissions.py` | ToolACL 角色权限层 |
+| `python/mini_claude/runtime/context.py` | Context 接口 + AgentContext |
+| `python/mini_claude/runtime/runtime.py` | AgentRuntime + RunResult |
+| `python/mini_claude/runtime/__init__.py` | 公共导出 |
+| `python/tests/runtime/test_config.py` | 配置校验测试（12 例） |
+| `python/tests/runtime/test_budget.py` | 预算测试（7 例） |
+| `python/tests/runtime/test_registry.py` | 注册表测试（11 例） |
+| `python/tests/runtime/test_acl.py` | ACL 测试（8 例） |
+| `python/tests/runtime/test_events_trace.py` | 事件/Trace 测试（8 例） |
+| `python/tests/runtime/test_runtime.py` | Runtime 集成测试（13 例） |
+
+### 4. 修改文件
+
+| 文件 | 修改 | 接口影响 |
+|------|------|----------|
+| `python/mini_claude/agent.py` | 增加 3 个运行时挂接点 + `_emit_event` + 12 处事件埋点 + 工具分发/激活集合可选覆盖 | 全部为可选、默认关闭；CLI 行为不变 |
+| `python/mini_claude/tools.py` | 暴露 `BUILTIN_TOOL_HANDLERS`；`get_active_tool_definitions` 增加关键字参数 `activated`（默认 None = 原全局集合） | 向后兼容 |
+
+### 5. 核心设计
+
+```
+AgentConfig (validate) ──┬─→ LLMProvider ──→ Agent 构造参数
+                         ├─→ ToolACL (read_only / allowed_tools)
+                         ├─→ Budget (cost / turns)
+                         └─→ ToolRegistry (实例级激活集合)
+
+AgentRuntime
+ ├─ events: EventEmitter ←─ Trace.attach
+ ├─ _build_agent(): 原 Agent + ACL 过滤后的 registry.active_definitions()
+ │    + agent._event_emit = events.emit
+ │    + agent._tool_dispatcher = registry.dispatch(acl=...)
+ │    + agent._active_tool_set = registry._activated
+ └─ run(prompt): RUN_STARTED → agent.run_once → token 差量入 Budget
+      → RUN_FINISHED → RunResult(text, tokens, turns, cost, trace, budget)
+```
+
+分发链：模型 tool_call → Agent 循环静态权限检查 → `_tool_dispatcher` →
+registry.dispatch →（ACL 检查 → 内置工具走原 execute_tool 保留
+read-before-edit；自定义工具走 handler）。
+
+### 6. 测试
+
+真实执行的命令：
+
+```bash
+/data/PR/venv/bin/python -m pytest python/tests/runtime/ -v   # 59 passed
+/data/PR/venv/bin/python -m pytest python/tests/ -q           # 72 passed（含原 13 例回归）
+/data/PR/venv/bin/python -m py_compile python/mini_claude/*.py python/mini_claude/runtime/*.py
+# CLI 集成（真实 LLM）：mini-claude → PHASE1_CLI_OK
+# Runtime 集成（真实 LLM）：planner + explorer 双实例独立运行 → RUNTIME_ROLE_OK ×2，
+#   llm_calls 各 1，planner 工具集 = [read_file, list_files, grep_search, tool_search]
+```
+
+### 7. 验证结果
+
+PASS
+
+```
+Runtime Unit Tests: 59/59 PASS
+Full Regression:    72/72 PASS
+Compile check:      PASS
+CLI integration:    PASS（真实 LLM 往返）
+Dual-role runtime:  PASS（真实 LLM，planner/explorer 独立实例）
+Execution time:     ~4s（测试）
+```
+
+### 8. Self-Repair
+
+- **失败 1**：LLM mock 测试 `result.text == ''`。Root Cause：stub 整个
+  `_call_anthropic_stream` 绕过了流式文本输出（`_emit_text` 在该函数内）。
+  修复：改为 fake SDK 边界（`messages.stream` 异步迭代器），让真实流式代码
+  参与测试；`RunResult.text` 规范化 strip 流式前导换行。
+- **失败 2**：测试文件残留草稿代码（不存在的 `dispatch_sync`、误用
+  `tempfile_write_target`）。修复：重写该测试文件。
+
+Repair attempts: 2
+
+### 9. Git 信息
+
+```
+Branch:
+feat/phase-01-agent-runtime
+
+Commits:
+0f1f08c feat(runtime): add event system, trace, budget, config and LLM provider
+fa06b38 feat(runtime): add tool interface, per-instance registry, role ACL and context
+77822a3 feat(runtime): add AgentRuntime compositing the original agent loop
+809abca refactor(agent): add optional runtime integration hooks to the agent loop
+c012033 test(runtime): add 59 runtime unit tests
+（docs commit 见下方追加）
+
+Remote:
+none（本地仓库无 origin 配置）
+
+Push Status:
+BLOCKED — 无 GitHub 凭据，按规约第 8 条记录为 IMPLEMENTED_BUT_PUSH_BLOCKED。
+
+Integration:
+见下方合并记录
+```
+
+### 10. 当前模块最终实现能力
+
+1. 使用 ToolRegistry + Tool 基类接口，实现每实例独立的工具注册、分发与
+   deferred 激活（多实例不再互相污染）。
+2. 使用 ToolACL + 原 check_permission 引擎，实现角色级只读/工具白名单与
+   定义过滤（模型看不到无权工具，运行时调用同样被拒）。
+3. 使用 AgentConfig 校验（13 项规则）+ LLMProvider，实现
+   `AgentRuntime(AgentConfig)` 一行构造独立角色实例。
+4. 使用 Budget 对象，实现 token/成本/轮次记账与超限检测（与 Agent 循环
+   共用同一套限制，事件化通知）。
+5. 使用 EventEmitter + Trace，实现 7 类规范事件的可观测流与指标聚合
+   （llm_calls/tool_calls/denials/tokens/cost/runtime）。
+6. 使用 Agent 循环挂接点（默认关闭），在不改动 Loop 本体的情况下把
+   原 CLI Agent 升级为多角色 Runtime；LLM mock 经 SDK 边界驱动真实循环
+   完成工具往返。
+
+### 11. 已知问题
+
+- GitHub Push 持续 BLOCKED（无凭据），见 Phase 0。
+- LLMProvider 目前只覆盖后端选择与模型能力元数据；真实传输仍由 Agent 内部
+  双后端代码承担（复用原则），Phase 5 若需要 Provider 级 mock 再扩展
+  stream() 接口。
+- 事件负载含完整工具结果字符串，大结果（>30KB 落盘）尚未在事件层截断，
+  Trace 内存占用风险留待 Phase 9 评估。
+
+### 12. 下一阶段依赖
+
+- Phase 2（Repository Intelligence）可直接复用：AgentRuntime 的 registry
+  （注册 symbol/dependency 查询工具）、Tool 接口（新增 repo 工具的基类）、
+  ToolACL（Explorer 角色 ACL）、Trace/Budget（repo 扫描任务的观测）。
+- 已稳定接口：`AgentRuntime(config).run(prompt) -> RunResult`、
+  `ToolRegistry.register/dispatch`、`ToolACL.check/filter_definitions`、
+  `AgentEvents.*`、`Budget.record_tokens/check`、`AgentConfig.validate/from_role`。
+- 限制：`Agent.chat()` 仍是 CLI 路径的入口；run() 基于 run_once 的
+  fork-return 语义（捕获输出，不回显终端）。

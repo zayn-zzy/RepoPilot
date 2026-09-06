@@ -236,6 +236,12 @@ class Agent:
         self._aborted = False
         self._current_task: asyncio.Task | None = None
 
+        # Runtime integration hooks — set by AgentRuntime; None keeps the
+        # standalone CLI path byte-for-byte unchanged.
+        self._event_emit: Callable[[str, dict], None] | None = None
+        self._tool_dispatcher: Callable[..., Awaitable[str]] | None = None
+        self._active_tool_set: set[str] | None = None
+
         # Permission whitelist
         self._confirmed_paths: set[str] = set()
 
@@ -485,6 +491,15 @@ class Agent:
             self._output_buffer.append(text)
         else:
             print_assistant_text(text)
+
+    def _emit_event(self, event_type: str, data: dict) -> None:
+        """Emit a typed event through the optional runtime hook. A no-op on the
+        plain CLI path (hook is None); a listener error never breaks the loop."""
+        if self._event_emit is not None:
+            try:
+                self._event_emit(event_type, data)
+            except Exception:
+                pass
 
     # ─── REPL commands ────────────────────────────────────────
 
@@ -1210,6 +1225,10 @@ class Agent:
         # Route MCP tool calls to the MCP manager
         if self._mcp_manager.is_mcp_tool(name):
             return await self._mcp_manager.call_tool(name, inp)
+        # AgentRuntime installs a dispatcher that routes through its per-instance
+        # ToolRegistry (with ACL); the plain CLI falls through to the module executor.
+        if self._tool_dispatcher is not None:
+            return await self._tool_dispatcher(name, inp, self._read_file_state)
         return await execute_tool(name, inp, self._read_file_state)
 
     # ─── Skill fork mode ─────────────────────────────────────
@@ -1549,6 +1568,7 @@ IMPORTANT: When your plan is complete, you MUST call exit_plan_mode. Do NOT ask 
             budget = self._check_budget()
             if budget["exceeded"]:
                 print_info(f"Budget exceeded: {budget['reason']}")
+                self._emit_event("budget_exceeded", {"reason": budget["reason"]})
                 # Every tool_use needs a paired tool_result or the message
                 # history is invalid for the next API call. Pair each pending
                 # call with a refusal instead of silently dropping it.
@@ -1570,6 +1590,7 @@ IMPORTANT: When your plan is complete, you MUST call exit_plan_mode. Do NOT ask 
                     break
                 inp = dict(tu.input) if hasattr(tu.input, 'items') else tu.input
                 print_tool_call(tu.name, inp)
+                self._emit_event("tool_call", {"tool_name": tu.name, "input": inp, "tool_use_id": tu.id})
 
                 # Was this tool already started during streaming?
                 early_task = early_executions.get(tu.id)
@@ -1577,6 +1598,7 @@ IMPORTANT: When your plan is complete, you MUST call exit_plan_mode. Do NOT ask 
                     raw = await early_task
                     res = self._persist_large_result(tu.name, raw)
                     print_tool_result(tu.name, res)
+                    self._emit_event("tool_result", {"tool_name": tu.name, "input": inp, "tool_use_id": tu.id, "result": res})
                     tool_results.append({"type": "tool_result", "tool_use_id": tu.id, "content": res})
                     continue
 
@@ -1588,6 +1610,7 @@ IMPORTANT: When your plan is complete, you MUST call exit_plan_mode. Do NOT ask 
                     perm = check_permission(tu.name, inp, self.permission_mode, self._plan_file_path)
                 if perm["action"] == "deny":
                     print_info(f"Denied: {perm.get('message', '')}")
+                    self._emit_event("permission_denied", {"tool_name": tu.name, "input": inp, "message": perm.get("message", "")})
                     tool_results.append({"type": "tool_result", "tool_use_id": tu.id, "content": f"Action denied: {perm.get('message', '')}"})
                     continue
                 if perm["action"] == "confirm" and perm.get("message"):
@@ -1606,6 +1629,7 @@ IMPORTANT: When your plan is complete, you MUST call exit_plan_mode. Do NOT ask 
                 raw = await self._execute_tool_call(tu.name, inp)
                 res = self._persist_large_result(tu.name, raw)
                 print_tool_result(tu.name, res)
+                self._emit_event("tool_result", {"tool_name": tu.name, "input": inp, "tool_use_id": tu.id, "result": res})
 
                 if self._context_cleared:
                     self._context_cleared = False
@@ -1636,12 +1660,13 @@ IMPORTANT: When your plan is complete, you MUST call exit_plan_mode. Do NOT ask 
         can start execution before the full response arrives (streaming tool
         execution -- inspired by Claude Code's content_block_stop streaming pattern)."""
         async def _do():
+            self._emit_event("llm_request", {"backend": "anthropic", "model": self.model})
             max_output = _get_max_output_tokens(self.model)
             create_params: dict[str, Any] = {
                 "model": self.model,
                 "max_tokens": max_output if self._thinking_mode != "disabled" else 16384,
                 "system": self._build_anthropic_system(),
-                "tools": get_active_tool_definitions(self.tools),
+                "tools": get_active_tool_definitions(self.tools, activated=self._active_tool_set),
                 # Rolling message-array cache breakpoint, applied to a copy so
                 # the persistent history stays free of cache_control metadata.
                 "messages": self._with_cache_breakpoints(self._anthropic_messages),
@@ -1770,6 +1795,7 @@ IMPORTANT: When your plan is complete, you MUST call exit_plan_mode. Do NOT ask 
             budget = self._check_budget()
             if budget["exceeded"]:
                 print_info(f"Budget exceeded: {budget['reason']}")
+                self._emit_event("budget_exceeded", {"reason": budget["reason"]})
                 # Same pairing requirement as the Anthropic path: every
                 # tool_call needs a role="tool" response.
                 for tc in tool_calls:
@@ -1795,6 +1821,7 @@ IMPORTANT: When your plan is complete, you MUST call exit_plan_mode. Do NOT ask 
                     inp = {}
 
                 print_tool_call(fn_name, inp)
+                self._emit_event("tool_call", {"tool_name": fn_name, "input": inp, "tool_use_id": tc.get("id", "")})
 
                 if self.permission_mode == "auto":
                     perm = await self._classify_tool_call(fn_name, inp)
@@ -1802,6 +1829,7 @@ IMPORTANT: When your plan is complete, you MUST call exit_plan_mode. Do NOT ask 
                     perm = check_permission(fn_name, inp, self.permission_mode, self._plan_file_path)
                 if perm["action"] == "deny":
                     print_info(f"Denied: {perm.get('message', '')}")
+                    self._emit_event("permission_denied", {"tool_name": fn_name, "input": inp, "message": perm.get("message", "")})
                     oai_checked.append({"tc": tc, "fn": fn_name, "inp": inp, "allowed": False, "result": f"Action denied: {perm.get('message', '')}"})
                     continue
                 if perm["action"] == "confirm" and perm.get("message"):
@@ -1837,6 +1865,7 @@ IMPORTANT: When your plan is complete, you MUST call exit_plan_mode. Do NOT ask 
                         raw = await self._execute_tool_call(ct_item["fn"], ct_item["inp"])
                         res = self._persist_large_result(ct_item["fn"], raw)
                         print_tool_result(ct_item["fn"], res)
+                        self._emit_event("tool_result", {"tool_name": ct_item["fn"], "input": ct_item["inp"], "tool_use_id": ct_item["tc"]["id"], "result": res})
                         return ct_item, res
 
                     results = await asyncio.gather(*[_run_oai_safe(ct) for ct in batch["items"]])
@@ -1850,6 +1879,7 @@ IMPORTANT: When your plan is complete, you MUST call exit_plan_mode. Do NOT ask 
                         raw = await self._execute_tool_call(ct["fn"], ct["inp"])
                         res = self._persist_large_result(ct["fn"], raw)
                         print_tool_result(ct["fn"], res)
+                        self._emit_event("tool_result", {"tool_name": ct["fn"], "input": ct["inp"], "tool_use_id": ct["tc"]["id"], "result": res})
 
                         if self._context_cleared:
                             self._context_cleared = False
@@ -1864,10 +1894,11 @@ IMPORTANT: When your plan is complete, you MUST call exit_plan_mode. Do NOT ask 
 
     async def _call_openai_stream(self) -> dict:
         async def _do():
+            self._emit_event("llm_request", {"backend": "openai", "model": self.model})
             stream = await self._openai_client.chat.completions.create(
                 model=self.model,
                 max_tokens=16384,
-                tools=_to_openai_tools(get_active_tool_definitions(self.tools)),
+                tools=_to_openai_tools(get_active_tool_definitions(self.tools, activated=self._active_tool_set)),
                 messages=self._openai_messages,
                 stream=True,
                 stream_options={"include_usage": True},
