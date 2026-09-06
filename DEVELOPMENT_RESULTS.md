@@ -513,16 +513,18 @@ e00d83c feat(repo): add import dependency graph and SQLite persistence
 1dd62e3 feat(repo): add RepositoryIndex with incremental updates
 827f77d chore(python): declare tree-sitter and networkx dependencies
 645c831 test(repo): add fixture repository and 71 repository intelligence tests
-（docs commit 见下方追加）
+583b534 docs(phase-02): record repository intelligence results and README usage
+42602a9 feat(phase-02): merge repository intelligence into repopilot-dev
 
 Remote:
 origin/feat/phase-02-repository-intelligence
 
 Push Status:
-（推送后填写）
+PASS（origin/feat/phase-02-repository-intelligence + origin/repopilot-dev 均已推送）
 
 Integration:
-（合并后填写）
+已合并入 repopilot-dev（merge commit 42602a9），合并后回归 143/143 PASS，
+repopilot-dev 已推送 origin
 ```
 
 ### 10. 当前模块最终实现能力
