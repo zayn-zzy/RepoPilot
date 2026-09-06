@@ -5,15 +5,16 @@
 
 ## Project Status
 
-Current Phase: Phase 1（Agent Runtime 重构）
+Current Phase: Phase 2（Repository Intelligence）
 Overall Status: IN_PROGRESS
 Integration Branch: repopilot-dev
 Last Updated: 2026-09-06
 
 | Phase | Module | Branch | Status | Tests | Remote Push |
 |------|------|------|------|------|------|
-| 0 | Baseline 理解 | chore/phase-00-baseline | COMPLETED（Push BLOCKED，见下） | 13/13 PASS | BLOCKED（无凭据） |
-| 1 | Agent Runtime | feat/phase-01-agent-runtime | COMPLETED（Push BLOCKED） | 72/72 PASS | BLOCKED（无凭据） |
+| 0 | Baseline 理解 | chore/phase-00-baseline | COMPLETED | 13/13 PASS | PASS（2026-09-06 补推） |
+| 1 | Agent Runtime | feat/phase-01-agent-runtime | COMPLETED | 72/72 PASS | PASS（2026-09-06 补推） |
+| 2 | Repository Intelligence | feat/phase-02-repository-intelligence | COMPLETED | 143/143 PASS | PASS |
 
 ---
 
@@ -363,3 +364,200 @@ Integration:
   `AgentEvents.*`、`Budget.record_tokens/check`、`AgentConfig.validate/from_role`。
 - 限制：`Agent.chat()` 仍是 CLI 路径的入口；run() 基于 run_once 的
   fork-return 语义（捕获输出，不回显终端）。
+
+---
+
+## Phase 2：Repository Intelligence
+
+### 1. 开发目标
+
+RepoPilot 第一核心技术模块：让系统"看懂"Python 仓库的结构。为 Phase 3 的
+Hybrid Retrieval（Structural Retrieval 依赖符号索引与依赖图）和 Phase 5 的
+Explorer Agent（符号搜索/依赖搜索工具）提供数据底座。本阶段仅支持 Python。
+
+### 2. 实现内容
+
+新增 `mini_claude/repo/` 包（6 个模块，约 900 行）：
+
+- **RepositoryScanner**：仓库文件发现。忽略 `.git/node_modules/venv/.venv/
+  dist/build/target/__pycache__/vendor` 等目录、隐藏目录、`*generated*`/
+  `*_pb2` 生成代码标记、>1MB 大文件；`path_to_module()` 将相对路径映射为
+  点分模块名（`pkg/__init__.py` → `pkg`，非法标识符路径 → None）。
+- **PythonParser（tree-sitter）**：函数/类/方法抽取（含嵌套函数、内部类、
+  方法识别、async/装饰器）、签名（`def f(x)`/`class Foo(Base)`）、docstring、
+  模块级 Import 抽取（`import x` / `from x import y` / 相对导入 dot 计数 /
+  alias / wildcard）。语法错误容错：ERROR 区域外的符号照常抽取，
+  `has_syntax_error` 标记。关键细节：tree-sitter 偏移是**字节偏移**，
+  文本切片必须走原始 bytes（多字节 UTF-8 内容不会错位）；tree-sitter-py
+  的 Node 包装对象不能按身份比较（按字节区间比较）；module_name 字段节点
+  不能泄漏成 import 目标。
+- **DependencyGraph（networkx）**：文件级 + 模块级双视图。导入解析：绝对、
+  相对（1-N 个 dot，按 Python `__package__` 语义，`__init__.py` 特判），
+  外部模块（stdlib/第三方）保留为无文件映射的模块节点；查询：
+  `file_dependencies` / `dependents` / `importers_of` / `module_dependencies`
+  / `closure` / `has_cycle` / `find_cycle` / 依赖优先的
+  `topological_order`（为 Phase 4 调度器预留）。
+- **SQLiteStore**：files/symbols/imports 三表 + meta 持久化；位置按仓库
+  相对路径存储，仓库搬家后数据库依然有效；索引建在 name/kind/qualified_name/
+  module 上。
+- **RepositoryIndex**：门面类。build() 两阶段（先全量解析，再统一重建图——
+  导入解析必须基于完整模块映射）；增量更新（mtime/size 预筛 + sha256 确认，
+  只重解析变更文件，删除文件自动清理符号与图边）；save()/load() 持久化
+  往返；查询 API：`find_symbol(name, kind)` / `find_definition(qname)`
+  （限定的全名或唯一裸名）/ `file_of_symbol` / `imports_of` /
+  `file_dependencies` / `module_dependencies` / `dependents` /
+  `file_of_module`。
+
+### 3. 新增文件
+
+| 文件 | 作用 |
+|------|------|
+| `python/mini_claude/repo/symbols.py` | Symbol/SymbolKind/Location/ImportInfo/ParsedModule/FileRecord 数据模型 |
+| `python/mini_claude/repo/scanner.py` | RepositoryScanner + 忽略规则 + path_to_module |
+| `python/mini_claude/repo/parser.py` | tree-sitter PythonParser（符号/Import 抽取） |
+| `python/mini_claude/repo/graph.py` | networkx DependencyGraph（文件/模块双视图） |
+| `python/mini_claude/repo/store.py` | SQLiteStore（持久化 + 相对路径归一化） |
+| `python/mini_claude/repo/index.py` | RepositoryIndex（构建/增量/查询门面） |
+| `python/tests/fixtures/repo_fixture/**` | 专用 Fixture 仓库（9 个可索引文件 + 忽略目录/生成代码/语法错误/循环导入/非模块文件名） |
+| `python/tests/repo/test_scanner.py` | 扫描器测试（12 例） |
+| `python/tests/repo/test_parser.py` | 解析器测试（19 例，含 Unicode 回归） |
+| `python/tests/repo/test_graph.py` | 依赖图测试（16 例） |
+| `python/tests/repo/test_store.py` | 持久化测试（3 例） |
+| `python/tests/repo/test_index.py` | 索引/查询/增量测试（21 例） |
+
+### 4. 修改文件
+
+| 文件 | 修改 | 接口影响 |
+|------|------|----------|
+| `python/pyproject.toml` | dependencies 增加 tree-sitter>=0.24 / tree-sitter-python>=0.23 / networkx>=3.0 | 新增安装依赖（repo 包为惰性导入，不装则 CLI 不受影响） |
+
+### 5. 核心设计
+
+```
+RepositoryIndex(root)
+ ├─ RepositoryScanner.scan()  → 相对路径列表（忽略规则过滤）
+ ├─ PythonParser.parse_file() → ParsedModule{symbols, imports, has_syntax_error, hash}
+ ├─ build(): mtime/size 预筛 → sha256 确认 → 只解析变更文件（增量）
+ │    └─ 两阶段：全部解析完 → DependencyGraph 重建（导入按完整模块映射解析）
+ ├─ SQLiteStore.save/load()   → 相对路径存储（仓库可搬迁）
+ └─ 查询: find_symbol / find_definition / imports_of / *_dependencies /
+         dependents / file_of_module / closure / topological_order
+```
+
+导入解析（DependencyGraph._resolve_module_name）：
+`from ..utils import add`（pkg/sub/helper.py）→ package=`pkg.sub`，up=1 →
+前缀 `pkg` + `utils` → `pkg.utils`；`from .core import X`（pkg/__init__.py）
+→ package=`pkg`（__init__ 特判）→ `pkg.core`；level 超出顶层 → None。
+
+### 6. 测试
+
+真实执行的命令：
+
+```bash
+/data/PR/venv/bin/python -m pytest python/tests/repo/ -v          # 71 passed
+/data/PR/venv/bin/python -m pytest python/tests/ -q              # 143 passed（含原 72 例回归）
+/data/PR/venv/bin/python -m py_compile python/mini_claude/repo/*.py
+
+# 中型仓库验证（python/ 自身，54 文件 / 624 符号 / 376 imports / 0.13s）
+# find_symbol('run')                → mini_claude.runtime.runtime.AgentRuntime.run
+# find_symbol('Agent', CLASS)       → mini_claude.agent.Agent
+# find_definition(Agent.chat)       → L445
+# imports_of(mini_claude/agent.py)  → os/typing/.tools/.memory/.autonomy/... 
+# module_dependencies(runtime)      → 9 个内部模块
+# dependents(mini_claude/tools.py)  → 8 个依赖者（agent/prompt/subagent/runtime/*）
+# file_of_module(repo.parser)       → mini_claude/repo/parser.py
+```
+
+### 7. 验证结果
+
+PASS
+
+```
+Repository Unit Tests: 71/71 PASS
+Full Regression:       143/143 PASS
+Compile check:         PASS
+Medium repo index:     PASS（54 files / 624 symbols / 376 imports / 0.13s，
+                       全部查询能力演示成功）
+Execution time:        ~5.3s（测试）
+```
+
+### 8. Self-Repair
+
+- **失败 1**：首次构建 crash——`remove_node` 不存在的节点。Root Cause：
+  `_parse_and_index` 对新文件先调用 `_remove_file`。修复：remove_file 幂等。
+- **失败 2**：图边缺失/错误。Root Cause：① 增量建图导致后解析模块解析不到；
+  ② 相对导入 level 计算把模块名里的点也算进去；③ `from X import` 的
+  module_name 字段节点泄漏为 import 目标（tree-sitter-py 包装对象不能按
+  `is` 比较）；④ `__init__.py` 的相对导入按 `__package__` 语义特判。
+  修复：两阶段重建图 + 只数前导点 + 字节区间比较 + 边界条件
+  `up >= len(package)`。
+- **失败 3**：中型仓库符号名全是垃圾切片。Root Cause：tree-sitter 偏移是
+  **字节偏移**，对解码后的 str 切片在含 `─`/CJK 的多字节内容处错位
+  （fixture 全 ASCII 没暴露）。修复：`_text()` 一律从原始 bytes 切片后解码，
+  并新增 Unicode 回归测试。
+- **失败 4**：持久化加载后依赖查询为空。Root Cause：Symbol/Import 的
+  file_path 是绝对路径，DB 键与内存相对键不一致。修复：store 层归一化
+  （存相对、载绝对）。
+
+Repair attempts: 4
+
+### 9. Git 信息
+
+```
+Branch:
+feat/phase-02-repository-intelligence
+
+Commits:
+7e3c780 feat(repo): add symbol model, scanner and tree-sitter Python parser
+e00d83c feat(repo): add import dependency graph and SQLite persistence
+1dd62e3 feat(repo): add RepositoryIndex with incremental updates
+827f77d chore(python): declare tree-sitter and networkx dependencies
+645c831 test(repo): add fixture repository and 71 repository intelligence tests
+（docs commit 见下方追加）
+
+Remote:
+origin/feat/phase-02-repository-intelligence
+
+Push Status:
+（推送后填写）
+
+Integration:
+（合并后填写）
+```
+
+### 10. 当前模块最终实现能力
+
+1. 使用 RepositoryScanner + 忽略规则集，实现仓库 Python 文件发现与
+   路径→模块名映射（vendor/生成代码/大文件/隐藏目录自动排除）。
+2. 使用 Tree-sitter，实现 Python 函数、类、方法、嵌套符号与 Import 的
+   AST 抽取（语法错误容错、字节精确的文本切片）。
+3. 使用 NetworkX，实现文件/模块两级 Import 依赖图（相对/绝对导入解析、
+   环检测、依赖优先拓扑序）。
+4. 使用 SQLite，实现 Repository Metadata、Symbol Index 与 Import 表的
+   持久化（相对路径存储，仓库可搬迁）。
+5. 使用文件 Hash 与 mtime 双检，实现 Changed File 的增量重新索引
+   （重解析数量可观测、删除文件自动清理）。
+6. 使用 RepositoryIndex 查询 API，实现符号搜索、定义定位、文件定位与
+   Import 依赖查询（0.13s 索引 54 文件中型仓库）。
+
+### 11. 已知问题
+
+- 不支持包名与文件名不一致（如 `import pkg.core` 但文件不在 pkg/core.py）
+  ——超出 Phase 2 范围，Phase 3 的检索层会用 fuzzy 回退补偿。
+- 导入解析不处理 `sys.path` hack / 动态导入 / 条件 re-export。
+- tree-sitter 依赖较新版本（0.24+），Python 3.11 以下环境不受支持
+  （与 pyproject requires-python 一致）。
+- GitHub 远端遗留一个误推的 `master` 分支（上游拷贝的 Initial commit），
+  默认分支仍指向它——需在网页端把 default branch 改为 main 后删除。
+
+### 12. 下一阶段依赖
+
+- Phase 3（Hybrid Retrieval）直接复用：find_symbol / find_definition /
+  imports_of / file_dependencies / dependents / closure（Structural
+  Retrieval 的 1-hop/2-hop 结构扩展）；Symbol 的 qualified_name/kind/
+  location 作为结构化候选特征；SQLite 里的符号表作为 Lexical 检索的
+  快速路径。
+- 已稳定接口：RepositoryIndex 全部查询方法、Symbol/ImportInfo 数据模型、
+  ParsedModule.content_hash（增量）、SQLiteStore 表结构（schema_version=1）。
+- 限制：仅 Python 仓库；图内未存储符号级引用边（symbol → symbol），
+  1-hop 结构扩展目前基于文件依赖。

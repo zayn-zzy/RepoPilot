@@ -59,6 +59,31 @@ planner / explorer / reviewer（只读）、coder（读写）、tester（读 + s
 general（全部工具）。Agent Loop 本体（流式、压缩、权限、子 Agent）未改动，
 CLI 行为与原来一致。
 
+## RepoPilot Repository Intelligence（Phase 2）
+
+`mini_claude/repo/` 对 Python 仓库做结构化索引（Tree-sitter 符号抽取 +
+Import 依赖图 + SQLite 持久化 + 增量更新）：
+
+```python
+from mini_claude.repo import RepositoryIndex, SymbolKind
+
+idx = RepositoryIndex("/path/to/repo", db_path=".repopilot/index.db")
+idx.build(persist=True)                      # 之后自动增量（只重解析变更文件）
+
+idx.find_symbol("process")                   # 按名称搜函数/类/方法
+idx.find_symbol("User", SymbolKind.CLASS)    # 带类型过滤
+idx.find_definition("pkg.core.Processor.run")  # 按限定名定位定义（文件+行号）
+idx.imports_of("pkg/core.py")                # 文件的 import 列表
+idx.file_dependencies("pkg/core.py")         # 文件依赖（绝对/相对导入均已解析）
+idx.dependents("pkg/utils.py")               # 谁依赖我
+idx.module_dependencies("pkg.core")          # 模块级依赖（含外部模块）
+idx.graph.closure("top_level.py")            # 传递闭包
+idx.graph.topological_order()                # 依赖优先拓扑序（无环时）
+```
+
+自动忽略 `.git / node_modules / venv / .venv / dist / build / __pycache__ /
+vendor / generated` 目录与 >1MB 文件；语法错误文件照常抽取有效区域的符号。
+
 ## 依赖
 
 - `anthropic` — Anthropic SDK（流式）
