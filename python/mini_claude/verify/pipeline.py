@@ -227,11 +227,14 @@ class VerificationPipeline:
             command = " ".join(argv)
             p = self._run_cmd(argv)
             failed_tests = self._parse_failed_tests(p) if p.returncode != 0 else []
+            # The change under verification is what the repair loop must
+            # retrieve — related_files = the change + what was tested.
+            related = list(dict.fromkeys(self.changed_files + files))
             return StageResult(stage=stage, status=self._status(p),
                                command=command, exit_code=p.returncode,
                                stdout=p.stdout, stderr=p.stderr,
                                failed_tests=failed_tests,
-                               related_files=files)
+                               related_files=related)
         return self._run_unittest_discover(stage, files)
 
     def _run_unittest_discover(self, stage: str, files: list[str]) -> StageResult:
@@ -271,7 +274,7 @@ class VerificationPipeline:
                     stage=stage, status="failed", command="; ".join(commands),
                     exit_code=p.returncode, stdout=out, stderr=p.stderr,
                     failed_tests=self._parse_failed_tests(p),
-                    related_files=files)
+                    related_files=list(dict.fromkeys(self.changed_files + files)))
         return StageResult(stage=stage, status="passed",
                            command="; ".join(commands),
                            stdout="\n".join(r.stdout for r in outputs if r.stdout),

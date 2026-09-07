@@ -23,7 +23,10 @@ BUG_REPO = Path(__file__).resolve().parents[1] / "fixtures" / "bug_repo"
 
 def _copy_bug_repo(tmp: Path) -> Path:
     dst = tmp / "bug_repo"
-    shutil.copytree(BUG_REPO, dst)
+    # Never copy pycache — stale assertion-rewrite pyc files would make
+    # pytest tracebacks reference the fixture's original paths.
+    shutil.copytree(BUG_REPO, dst,
+                    ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache"))
     return dst
 
 

@@ -14,6 +14,7 @@ the coder never grades its own work. At most max_repair_attempts
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -79,25 +80,34 @@ class SelfRepairEngine:
 
     async def repair(self, failure: VerificationFailure) -> RepairResult:
         """Run the loop until a targeted re-test passes or the attempt
-        budget is exhausted."""
+        budget is exhausted.
+
+        The coder's file tools are cwd-relative, so the whole loop runs
+        with the process cwd bound to the repair root (restored after —
+        the same isolation discipline as TeamRunner/Phase 6)."""
         result = RepairResult(failure=failure)
-        for attempt_no in range(1, self.max_repair_attempts + 1):
-            prompt = self._build_prompt(failure, attempt_no, result.attempts)
-            runtime = self._build_coder()
-            if self._after_build is not None:
-                self._after_build(runtime)
-            run = await runtime.run(prompt)
-            outcome_text = (run.text or "").strip()
-            await runtime.close()
-            re_test = self._targeted_retest(failure)
-            attempt = RepairAttempt(
-                attempt=attempt_no, prompt=prompt, outcome_text=outcome_text,
-                re_test=re_test, fixed=re_test.passed,
-            )
-            result.attempts.append(attempt)
-            if attempt.fixed:
-                result.fixed = True
-                break
+        previous_cwd = os.getcwd()
+        os.chdir(self.root)
+        try:
+            for attempt_no in range(1, self.max_repair_attempts + 1):
+                prompt = self._build_prompt(failure, attempt_no, result.attempts)
+                runtime = self._build_coder()
+                if self._after_build is not None:
+                    self._after_build(runtime)
+                run = await runtime.run(prompt)
+                outcome_text = (run.text or "").strip()
+                await runtime.close()
+                re_test = self._targeted_retest(failure)
+                attempt = RepairAttempt(
+                    attempt=attempt_no, prompt=prompt, outcome_text=outcome_text,
+                    re_test=re_test, fixed=re_test.passed,
+                )
+                result.attempts.append(attempt)
+                if attempt.fixed:
+                    result.fixed = True
+                    break
+        finally:
+            os.chdir(previous_cwd)
         return result
 
     # ─── the loop's steps ──────────────────────────────────────
