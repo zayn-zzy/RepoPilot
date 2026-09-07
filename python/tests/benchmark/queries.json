@@ -1,0 +1,126 @@
+{
+  "corpus": "python/mini_claude",
+  "description": "Hand-labeled retrieval queries over the mini_claude corpus (40 .py files), tiered by difficulty: easy queries name a unique identifier; medium queries are paraphrases without the exact token; hard queries ask about relationships (who calls / who uses), where the dependency graph matters. relevant_files are judged manually by the developer. All benchmark numbers are computed from these judgments by tests/benchmark/retrieval_benchmark.py.",
+  "queries": [
+    {
+      "id": "q01",
+      "query": "check_permission 权限检查函数",
+      "difficulty": "easy",
+      "relevant_files": ["tools.py"]
+    },
+    {
+      "id": "q02",
+      "query": "save_session 会话保存",
+      "difficulty": "easy",
+      "relevant_files": ["session.py"]
+    },
+    {
+      "id": "q03",
+      "query": "SKILL.md 技能文件解析",
+      "difficulty": "easy",
+      "relevant_files": ["skills.py", "frontmatter.py"]
+    },
+    {
+      "id": "q04",
+      "query": "MCP 客户端连接与调用",
+      "difficulty": "easy",
+      "relevant_files": ["mcp_client.py"]
+    },
+    {
+      "id": "q05",
+      "query": "parse_goal_verdict 判决解析",
+      "difficulty": "easy",
+      "relevant_files": ["autonomy.py"]
+    },
+    {
+      "id": "q06",
+      "query": "conversation history persistence to disk",
+      "difficulty": "medium",
+      "relevant_files": ["session.py", "agent.py"]
+    },
+    {
+      "id": "q07",
+      "query": "how to limit agent spending and turns",
+      "difficulty": "medium",
+      "relevant_files": ["runtime/budget.py", "agent.py"]
+    },
+    {
+      "id": "q08",
+      "query": "repository symbol index incremental update",
+      "difficulty": "medium",
+      "relevant_files": ["repo/index.py"]
+    },
+    {
+      "id": "q09",
+      "query": "role configuration validation rules",
+      "difficulty": "medium",
+      "relevant_files": ["runtime/config.py"]
+    },
+    {
+      "id": "q10",
+      "query": "spawn sub agent for independent tasks",
+      "difficulty": "medium",
+      "relevant_files": ["subagent.py", "agent.py"]
+    },
+    {
+      "id": "q11",
+      "query": "terminal colored output UI rendering",
+      "difficulty": "medium",
+      "relevant_files": ["ui.py"]
+    },
+    {
+      "id": "q12",
+      "query": "memory recall semantic selection",
+      "difficulty": "medium",
+      "relevant_files": ["memory.py"]
+    },
+    {
+      "id": "q13",
+      "query": "streaming LLM request retry backoff",
+      "difficulty": "medium",
+      "relevant_files": ["agent.py"]
+    },
+    {
+      "id": "q14",
+      "query": "check_permission 被哪些文件调用",
+      "difficulty": "hard",
+      "relevant_files": ["tools.py", "agent.py"]
+    },
+    {
+      "id": "q15",
+      "query": "ToolRegistry 实例化的地方",
+      "difficulty": "hard",
+      "relevant_files": ["runtime/registry.py", "runtime/runtime.py"]
+    },
+    {
+      "id": "q16",
+      "query": "EventEmitter 的订阅者",
+      "difficulty": "hard",
+      "relevant_files": ["runtime/events.py", "runtime/trace.py"]
+    },
+    {
+      "id": "q17",
+      "query": "RepositoryIndex 的使用者",
+      "difficulty": "hard",
+      "relevant_files": ["repo/index.py", "retrieval/pipeline.py", "retrieval/structural.py"]
+    },
+    {
+      "id": "q18",
+      "query": "AgentConfig 角色档案 from_role",
+      "difficulty": "hard",
+      "relevant_files": ["runtime/config.py"]
+    },
+    {
+      "id": "q19",
+      "query": "工具注册表 registry 的构建",
+      "difficulty": "hard",
+      "relevant_files": ["runtime/registry.py"]
+    },
+    {
+      "id": "q20",
+      "query": "find_definition 定位函数定义",
+      "difficulty": "hard",
+      "relevant_files": ["repo/index.py", "retrieval/structural.py"]
+    }
+  ]
+}

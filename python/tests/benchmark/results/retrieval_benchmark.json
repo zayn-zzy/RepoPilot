@@ -1,0 +1,2254 @@
+{
+  "corpus": "python/mini_claude",
+  "num_files": 40,
+  "num_queries": 20,
+  "topk": 10,
+  "results": [
+    {
+      "method": "grep",
+      "aggregate": {
+        "recall@5": 0.8167,
+        "recall@10": 0.8833,
+        "mrr": 0.7396,
+        "hit@5": 0.95,
+        "hit@10": 1.0
+      },
+      "by_difficulty": {
+        "easy": {
+          "recall@5": 0.9,
+          "recall@10": 0.9,
+          "mrr": 0.6667
+        },
+        "hard": {
+          "recall@5": 0.8333,
+          "recall@10": 0.881,
+          "mrr": 0.7143
+        },
+        "medium": {
+          "recall@5": 0.75,
+          "recall@10": 0.875,
+          "mrr": 0.8073
+        }
+      },
+      "per_query": {
+        "q01": {
+          "query": "check_permission 权限检查函数",
+          "difficulty": "easy",
+          "retrieved": [
+            "agent.py",
+            "runtime/permissions.py",
+            "tools.py",
+            "retrieval/lexical.py"
+          ],
+          "relevant": [
+            "tools.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.3333333333333333,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 15.5
+        },
+        "q02": {
+          "query": "save_session 会话保存",
+          "difficulty": "easy",
+          "retrieved": [
+            "agent.py",
+            "session.py"
+          ],
+          "relevant": [
+            "session.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 11.5
+        },
+        "q03": {
+          "query": "SKILL.md 技能文件解析",
+          "difficulty": "easy",
+          "retrieved": [
+            "skills.py",
+            "__main__.py",
+            "agent.py",
+            "prompt.py",
+            "autonomy.py",
+            "tools.py",
+            "memory.py",
+            "ui.py",
+            "runtime/permissions.py",
+            "subagent.py"
+          ],
+          "relevant": [
+            "frontmatter.py",
+            "skills.py"
+          ],
+          "metrics": {
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 21.6
+        },
+        "q04": {
+          "query": "MCP 客户端连接与调用",
+          "difficulty": "easy",
+          "retrieved": [
+            "mcp_client.py",
+            "agent.py",
+            "__main__.py"
+          ],
+          "relevant": [
+            "mcp_client.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 7.1
+        },
+        "q05": {
+          "query": "parse_goal_verdict 判决解析",
+          "difficulty": "easy",
+          "retrieved": [
+            "agent.py",
+            "autonomy.py"
+          ],
+          "relevant": [
+            "autonomy.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 6.1
+        },
+        "q06": {
+          "query": "conversation history persistence to disk",
+          "difficulty": "medium",
+          "retrieved": [
+            "agent.py",
+            "autonomy.py",
+            "tools.py",
+            "prompt.py",
+            "runtime/registry.py",
+            "subagent.py",
+            "runtime/runtime.py",
+            "runtime/permissions.py",
+            "repo/index.py",
+            "mcp_client.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "session.py"
+          ],
+          "metrics": {
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 27.9
+        },
+        "q07": {
+          "query": "how to limit agent spending and turns",
+          "difficulty": "medium",
+          "retrieved": [
+            "agent.py",
+            "tools.py",
+            "autonomy.py",
+            "prompt.py",
+            "subagent.py",
+            "runtime/runtime.py",
+            "__main__.py",
+            "runtime/registry.py",
+            "runtime/permissions.py",
+            "mcp_client.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "runtime/budget.py"
+          ],
+          "metrics": {
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 27.8
+        },
+        "q08": {
+          "query": "repository symbol index incremental update",
+          "difficulty": "medium",
+          "retrieved": [
+            "repo/index.py",
+            "repo/store.py",
+            "memory.py",
+            "retrieval/structural.py",
+            "retrieval/lexical.py",
+            "retrieval/fusion.py",
+            "repo/__init__.py",
+            "repo/parser.py",
+            "retrieval/context.py",
+            "repo/symbols.py"
+          ],
+          "relevant": [
+            "repo/index.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 26.0
+        },
+        "q09": {
+          "query": "role configuration validation rules",
+          "difficulty": "medium",
+          "retrieved": [
+            "agent.py",
+            "autonomy.py",
+            "runtime/config.py",
+            "tools.py",
+            "prompt.py",
+            "runtime/permissions.py",
+            "runtime/runtime.py",
+            "runtime/__init__.py",
+            "subagent.py",
+            "memory.py"
+          ],
+          "relevant": [
+            "runtime/config.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.3333333333333333,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 16.2
+        },
+        "q10": {
+          "query": "spawn sub agent for independent tasks",
+          "difficulty": "medium",
+          "retrieved": [
+            "agent.py",
+            "prompt.py",
+            "subagent.py",
+            "tools.py",
+            "runtime/runtime.py",
+            "__main__.py",
+            "autonomy.py",
+            "memory.py",
+            "ui.py",
+            "mcp_client.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "subagent.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 28.7
+        },
+        "q11": {
+          "query": "terminal colored output UI rendering",
+          "difficulty": "medium",
+          "retrieved": [
+            "agent.py",
+            "prompt.py",
+            "tools.py",
+            "autonomy.py",
+            "repo/index.py",
+            "runtime/runtime.py",
+            "retrieval/pipeline.py",
+            "ui.py",
+            "runtime/registry.py",
+            "subagent.py"
+          ],
+          "relevant": [
+            "ui.py"
+          ],
+          "metrics": {
+            "recall@5": 0.0,
+            "recall@10": 1.0,
+            "mrr": 0.125,
+            "hit@5": 0.0,
+            "hit@10": 1.0
+          },
+          "ms": 20.3
+        },
+        "q12": {
+          "query": "memory recall semantic selection",
+          "difficulty": "medium",
+          "retrieved": [
+            "memory.py",
+            "agent.py",
+            "retrieval/pipeline.py",
+            "tools.py",
+            "prompt.py",
+            "retrieval/__init__.py",
+            "retrieval/semantic.py",
+            "__main__.py",
+            "retrieval/fusion.py",
+            "frontmatter.py"
+          ],
+          "relevant": [
+            "memory.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 20.5
+        },
+        "q13": {
+          "query": "streaming LLM request retry backoff",
+          "difficulty": "medium",
+          "retrieved": [
+            "agent.py",
+            "runtime/trace.py",
+            "mcp_client.py",
+            "prompt.py",
+            "runtime/events.py",
+            "runtime/provider.py",
+            "tools.py",
+            "runtime/runtime.py",
+            "ui.py",
+            "__main__.py"
+          ],
+          "relevant": [
+            "agent.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 21.6
+        },
+        "q14": {
+          "query": "check_permission 被哪些文件调用",
+          "difficulty": "hard",
+          "retrieved": [
+            "agent.py",
+            "runtime/permissions.py",
+            "tools.py",
+            "retrieval/lexical.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "tools.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 4.4
+        },
+        "q15": {
+          "query": "ToolRegistry 实例化的地方",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/registry.py",
+            "runtime/runtime.py",
+            "runtime/__init__.py",
+            "agent.py",
+            "tools.py"
+          ],
+          "relevant": [
+            "runtime/registry.py",
+            "runtime/runtime.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 3.2
+        },
+        "q16": {
+          "query": "EventEmitter 的订阅者",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/runtime.py",
+            "runtime/trace.py",
+            "runtime/__init__.py",
+            "runtime/events.py"
+          ],
+          "relevant": [
+            "runtime/events.py",
+            "runtime/trace.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 3.0
+        },
+        "q17": {
+          "query": "RepositoryIndex 的使用者",
+          "difficulty": "hard",
+          "retrieved": [
+            "repo/__init__.py",
+            "repo/index.py",
+            "repo/store.py",
+            "retrieval/__init__.py",
+            "retrieval/lexical.py",
+            "retrieval/structural.py"
+          ],
+          "relevant": [
+            "repo/index.py",
+            "retrieval/pipeline.py",
+            "retrieval/structural.py"
+          ],
+          "metrics": {
+            "recall@5": 0.3333333333333333,
+            "recall@10": 0.6666666666666666,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 2.8
+        },
+        "q18": {
+          "query": "AgentConfig 角色档案 from_role",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/runtime.py",
+            "runtime/config.py",
+            "runtime/provider.py",
+            "runtime/__init__.py"
+          ],
+          "relevant": [
+            "runtime/config.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 9.0
+        },
+        "q19": {
+          "query": "工具注册表 registry 的构建",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/runtime.py",
+            "runtime/registry.py",
+            "runtime/__init__.py",
+            "tools.py",
+            "agent.py"
+          ],
+          "relevant": [
+            "runtime/registry.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 4.3
+        },
+        "q20": {
+          "query": "find_definition 定位函数定义",
+          "difficulty": "hard",
+          "retrieved": [
+            "repo/index.py"
+          ],
+          "relevant": [
+            "repo/index.py",
+            "retrieval/structural.py"
+          ],
+          "metrics": {
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 2.7
+        }
+      }
+    },
+    {
+      "method": "semantic",
+      "aggregate": {
+        "recall@5": 0.9083,
+        "recall@10": 0.925,
+        "mrr": 0.7625,
+        "hit@5": 1.0,
+        "hit@10": 1.0
+      },
+      "by_difficulty": {
+        "easy": {
+          "recall@5": 0.9,
+          "recall@10": 0.9,
+          "mrr": 0.85
+        },
+        "hard": {
+          "recall@5": 0.881,
+          "recall@10": 0.9286,
+          "mrr": 0.5952
+        },
+        "medium": {
+          "recall@5": 0.9375,
+          "recall@10": 0.9375,
+          "mrr": 0.8542
+        }
+      },
+      "per_query": {
+        "q01": {
+          "query": "check_permission 权限检查函数",
+          "difficulty": "easy",
+          "retrieved": [
+            "runtime/permissions.py",
+            "retrieval/lexical.py",
+            "agent.py",
+            "tools.py",
+            "retrieval/pipeline.py",
+            "repo/__init__.py",
+            "retrieval/model.py",
+            "repo/store.py",
+            "runtime/registry.py",
+            "repo/graph.py"
+          ],
+          "relevant": [
+            "tools.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.25,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 4.8
+        },
+        "q02": {
+          "query": "save_session 会话保存",
+          "difficulty": "easy",
+          "retrieved": [
+            "session.py",
+            "agent.py",
+            "retrieval/pipeline.py",
+            "repo/__init__.py",
+            "retrieval/model.py",
+            "repo/store.py",
+            "runtime/registry.py",
+            "repo/graph.py",
+            "runtime/trace.py",
+            "memory.py"
+          ],
+          "relevant": [
+            "session.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 2.5
+        },
+        "q03": {
+          "query": "SKILL.md 技能文件解析",
+          "difficulty": "easy",
+          "retrieved": [
+            "skills.py",
+            "__main__.py",
+            "tools.py",
+            "memory.py",
+            "ui.py",
+            "agent.py",
+            "runtime/permissions.py",
+            "autonomy.py",
+            "prompt.py",
+            "subagent.py"
+          ],
+          "relevant": [
+            "frontmatter.py",
+            "skills.py"
+          ],
+          "metrics": {
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 2.4
+        },
+        "q04": {
+          "query": "MCP 客户端连接与调用",
+          "difficulty": "easy",
+          "retrieved": [
+            "mcp_client.py",
+            "__main__.py",
+            "agent.py",
+            "retrieval/__init__.py",
+            "retrieval/fusion.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "tools.py",
+            "frontmatter.py",
+            "runtime/runtime.py"
+          ],
+          "relevant": [
+            "mcp_client.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 2.2
+        },
+        "q05": {
+          "query": "parse_goal_verdict 判决解析",
+          "difficulty": "easy",
+          "retrieved": [
+            "autonomy.py",
+            "agent.py",
+            "retrieval/__init__.py",
+            "retrieval/fusion.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "tools.py",
+            "frontmatter.py",
+            "runtime/runtime.py",
+            "retrieval/lexical.py"
+          ],
+          "relevant": [
+            "autonomy.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.9
+        },
+        "q06": {
+          "query": "conversation history persistence to disk",
+          "difficulty": "medium",
+          "retrieved": [
+            "session.py",
+            "runtime/context.py",
+            "agent.py",
+            "repo/__init__.py",
+            "__main__.py",
+            "runtime/events.py",
+            "autonomy.py",
+            "tools.py",
+            "repo/index.py",
+            "prompt.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "session.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 2.0
+        },
+        "q07": {
+          "query": "how to limit agent spending and turns",
+          "difficulty": "medium",
+          "retrieved": [
+            "runtime/budget.py",
+            "retrieval/analyzer.py",
+            "runtime/runtime.py",
+            "__main__.py",
+            "agent.py",
+            "runtime/trace.py",
+            "subagent.py",
+            "runtime/registry.py",
+            "__init__.py",
+            "autonomy.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "runtime/budget.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.6
+        },
+        "q08": {
+          "query": "repository symbol index incremental update",
+          "difficulty": "medium",
+          "retrieved": [
+            "repo/__init__.py",
+            "repo/symbols.py",
+            "repo/index.py",
+            "retrieval/context.py",
+            "repo/store.py",
+            "retrieval/structural.py",
+            "retrieval/lexical.py",
+            "retrieval/fusion.py",
+            "retrieval/__init__.py",
+            "memory.py"
+          ],
+          "relevant": [
+            "repo/index.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.3333333333333333,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.5
+        },
+        "q09": {
+          "query": "role configuration validation rules",
+          "difficulty": "medium",
+          "retrieved": [
+            "runtime/config.py",
+            "runtime/permissions.py",
+            "prompt.py",
+            "autonomy.py",
+            "runtime/__init__.py",
+            "agent.py",
+            "runtime/runtime.py",
+            "tools.py",
+            "repo/scanner.py",
+            "subagent.py"
+          ],
+          "relevant": [
+            "runtime/config.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.5
+        },
+        "q10": {
+          "query": "spawn sub agent for independent tasks",
+          "difficulty": "medium",
+          "retrieved": [
+            "subagent.py",
+            "prompt.py",
+            "__init__.py",
+            "runtime/permissions.py",
+            "repo/symbols.py",
+            "runtime/context.py",
+            "ui.py",
+            "runtime/runtime.py",
+            "mcp_client.py",
+            "runtime/__init__.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "subagent.py"
+          ],
+          "metrics": {
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.4
+        },
+        "q11": {
+          "query": "terminal colored output UI rendering",
+          "difficulty": "medium",
+          "retrieved": [
+            "ui.py",
+            "runtime/events.py",
+            "runtime/budget.py",
+            "runtime/runtime.py",
+            "prompt.py",
+            "tools.py",
+            "agent.py",
+            "autonomy.py",
+            "__main__.py",
+            "subagent.py"
+          ],
+          "relevant": [
+            "ui.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.3
+        },
+        "q12": {
+          "query": "memory recall semantic selection",
+          "difficulty": "medium",
+          "retrieved": [
+            "memory.py",
+            "retrieval/__init__.py",
+            "retrieval/pipeline.py",
+            "runtime/provider.py",
+            "retrieval/semantic.py",
+            "agent.py",
+            "retrieval/fusion.py",
+            "frontmatter.py",
+            "runtime/trace.py",
+            "__main__.py"
+          ],
+          "relevant": [
+            "memory.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.4
+        },
+        "q13": {
+          "query": "streaming LLM request retry backoff",
+          "difficulty": "medium",
+          "retrieved": [
+            "runtime/provider.py",
+            "agent.py",
+            "ui.py",
+            "runtime/tools.py",
+            "runtime/runtime.py",
+            "runtime/trace.py",
+            "tools.py",
+            "retrieval/context.py",
+            "prompt.py",
+            "runtime/registry.py"
+          ],
+          "relevant": [
+            "agent.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.4
+        },
+        "q14": {
+          "query": "check_permission 被哪些文件调用",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/permissions.py",
+            "retrieval/lexical.py",
+            "agent.py",
+            "tools.py",
+            "retrieval/pipeline.py",
+            "repo/__init__.py",
+            "retrieval/model.py",
+            "repo/store.py",
+            "runtime/registry.py",
+            "repo/graph.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "tools.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.3333333333333333,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.4
+        },
+        "q15": {
+          "query": "ToolRegistry 实例化的地方",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/__init__.py",
+            "runtime/registry.py",
+            "runtime/runtime.py",
+            "tools.py",
+            "agent.py",
+            "retrieval/__init__.py",
+            "retrieval/fusion.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "frontmatter.py"
+          ],
+          "relevant": [
+            "runtime/registry.py",
+            "runtime/runtime.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.3
+        },
+        "q16": {
+          "query": "EventEmitter 的订阅者",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/__init__.py",
+            "runtime/trace.py",
+            "runtime/runtime.py",
+            "runtime/events.py",
+            "retrieval/__init__.py",
+            "retrieval/fusion.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "tools.py",
+            "frontmatter.py"
+          ],
+          "relevant": [
+            "runtime/events.py",
+            "runtime/trace.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.3
+        },
+        "q17": {
+          "query": "RepositoryIndex 的使用者",
+          "difficulty": "hard",
+          "retrieved": [
+            "repo/__init__.py",
+            "retrieval/__init__.py",
+            "repo/index.py",
+            "retrieval/lexical.py",
+            "retrieval/structural.py",
+            "repo/store.py",
+            "retrieval/pipeline.py",
+            "retrieval/model.py",
+            "runtime/registry.py",
+            "repo/graph.py"
+          ],
+          "relevant": [
+            "repo/index.py",
+            "retrieval/pipeline.py",
+            "retrieval/structural.py"
+          ],
+          "metrics": {
+            "recall@5": 0.6666666666666666,
+            "recall@10": 1.0,
+            "mrr": 0.3333333333333333,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.2
+        },
+        "q18": {
+          "query": "AgentConfig 角色档案 from_role",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/runtime.py",
+            "runtime/config.py",
+            "runtime/__init__.py",
+            "runtime/provider.py",
+            "retrieval/pipeline.py",
+            "repo/__init__.py",
+            "retrieval/model.py",
+            "repo/store.py",
+            "runtime/registry.py",
+            "repo/graph.py"
+          ],
+          "relevant": [
+            "runtime/config.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.3
+        },
+        "q19": {
+          "query": "工具注册表 registry 的构建",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/registry.py",
+            "runtime/runtime.py",
+            "runtime/__init__.py",
+            "tools.py",
+            "retrieval/__init__.py",
+            "retrieval/fusion.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "frontmatter.py",
+            "retrieval/lexical.py"
+          ],
+          "relevant": [
+            "runtime/registry.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.2
+        },
+        "q20": {
+          "query": "find_definition 定位函数定义",
+          "difficulty": "hard",
+          "retrieved": [
+            "repo/index.py",
+            "retrieval/pipeline.py",
+            "repo/__init__.py",
+            "retrieval/model.py",
+            "repo/store.py",
+            "runtime/registry.py",
+            "repo/graph.py",
+            "runtime/trace.py",
+            "memory.py",
+            "runtime/config.py"
+          ],
+          "relevant": [
+            "repo/index.py",
+            "retrieval/structural.py"
+          ],
+          "metrics": {
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 1.2
+        }
+      }
+    },
+    {
+      "method": "hybrid",
+      "aggregate": {
+        "recall@5": 0.9083,
+        "recall@10": 0.925,
+        "mrr": 0.925,
+        "hit@5": 1.0,
+        "hit@10": 1.0
+      },
+      "by_difficulty": {
+        "easy": {
+          "recall@5": 0.9,
+          "recall@10": 0.9,
+          "mrr": 1.0
+        },
+        "hard": {
+          "recall@5": 0.881,
+          "recall@10": 0.9286,
+          "mrr": 0.9286
+        },
+        "medium": {
+          "recall@5": 0.9375,
+          "recall@10": 0.9375,
+          "mrr": 0.875
+        }
+      },
+      "per_query": {
+        "q01": {
+          "query": "check_permission 权限检查函数",
+          "difficulty": "easy",
+          "retrieved": [
+            "tools.py",
+            "runtime/permissions.py",
+            "retrieval/lexical.py",
+            "agent.py",
+            "retrieval/pipeline.py",
+            "repo/__init__.py",
+            "retrieval/model.py",
+            "repo/store.py",
+            "runtime/registry.py",
+            "repo/graph.py"
+          ],
+          "relevant": [
+            "tools.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 139.5
+        },
+        "q02": {
+          "query": "save_session 会话保存",
+          "difficulty": "easy",
+          "retrieved": [
+            "session.py",
+            "agent.py",
+            "retrieval/pipeline.py",
+            "repo/__init__.py",
+            "retrieval/model.py",
+            "repo/store.py",
+            "runtime/registry.py",
+            "repo/graph.py",
+            "runtime/trace.py",
+            "memory.py"
+          ],
+          "relevant": [
+            "session.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 163.7
+        },
+        "q03": {
+          "query": "SKILL.md 技能文件解析",
+          "difficulty": "easy",
+          "retrieved": [
+            "skills.py",
+            "__main__.py",
+            "tools.py",
+            "memory.py",
+            "agent.py",
+            "autonomy.py",
+            "ui.py",
+            "prompt.py",
+            "runtime/permissions.py",
+            "subagent.py"
+          ],
+          "relevant": [
+            "frontmatter.py",
+            "skills.py"
+          ],
+          "metrics": {
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 164.9
+        },
+        "q04": {
+          "query": "MCP 客户端连接与调用",
+          "difficulty": "easy",
+          "retrieved": [
+            "mcp_client.py",
+            "__main__.py",
+            "agent.py",
+            "retrieval/__init__.py",
+            "retrieval/fusion.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "tools.py",
+            "frontmatter.py",
+            "runtime/runtime.py"
+          ],
+          "relevant": [
+            "mcp_client.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 163.7
+        },
+        "q05": {
+          "query": "parse_goal_verdict 判决解析",
+          "difficulty": "easy",
+          "retrieved": [
+            "autonomy.py",
+            "agent.py",
+            "retrieval/__init__.py",
+            "retrieval/fusion.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "tools.py",
+            "frontmatter.py",
+            "runtime/runtime.py",
+            "retrieval/lexical.py"
+          ],
+          "relevant": [
+            "autonomy.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 163.3
+        },
+        "q06": {
+          "query": "conversation history persistence to disk",
+          "difficulty": "medium",
+          "retrieved": [
+            "session.py",
+            "runtime/context.py",
+            "agent.py",
+            "__main__.py",
+            "repo/__init__.py",
+            "autonomy.py",
+            "runtime/events.py",
+            "repo/index.py",
+            "tools.py",
+            "prompt.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "session.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 166.1
+        },
+        "q07": {
+          "query": "how to limit agent spending and turns",
+          "difficulty": "medium",
+          "retrieved": [
+            "runtime/budget.py",
+            "agent.py",
+            "runtime/runtime.py",
+            "__main__.py",
+            "retrieval/analyzer.py",
+            "runtime/registry.py",
+            "runtime/trace.py",
+            "autonomy.py",
+            "subagent.py",
+            "runtime/events.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "runtime/budget.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 165.0
+        },
+        "q08": {
+          "query": "repository symbol index incremental update",
+          "difficulty": "medium",
+          "retrieved": [
+            "repo/__init__.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "retrieval/context.py",
+            "repo/store.py",
+            "retrieval/lexical.py",
+            "retrieval/structural.py",
+            "memory.py",
+            "retrieval/fusion.py",
+            "retrieval/pipeline.py"
+          ],
+          "relevant": [
+            "repo/index.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 167.5
+        },
+        "q09": {
+          "query": "role configuration validation rules",
+          "difficulty": "medium",
+          "retrieved": [
+            "runtime/config.py",
+            "runtime/permissions.py",
+            "prompt.py",
+            "autonomy.py",
+            "agent.py",
+            "runtime/runtime.py",
+            "runtime/__init__.py",
+            "tools.py",
+            "repo/scanner.py",
+            "subagent.py"
+          ],
+          "relevant": [
+            "runtime/config.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 156.5
+        },
+        "q10": {
+          "query": "spawn sub agent for independent tasks",
+          "difficulty": "medium",
+          "retrieved": [
+            "subagent.py",
+            "prompt.py",
+            "ui.py",
+            "runtime/permissions.py",
+            "mcp_client.py",
+            "runtime/runtime.py",
+            "tools.py",
+            "repo/symbols.py",
+            "__main__.py",
+            "runtime/context.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "subagent.py"
+          ],
+          "metrics": {
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 151.1
+        },
+        "q11": {
+          "query": "terminal colored output UI rendering",
+          "difficulty": "medium",
+          "retrieved": [
+            "ui.py",
+            "runtime/events.py",
+            "runtime/runtime.py",
+            "runtime/budget.py",
+            "prompt.py",
+            "tools.py",
+            "agent.py",
+            "autonomy.py",
+            "__main__.py",
+            "subagent.py"
+          ],
+          "relevant": [
+            "ui.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 150.5
+        },
+        "q12": {
+          "query": "memory recall semantic selection",
+          "difficulty": "medium",
+          "retrieved": [
+            "memory.py",
+            "retrieval/pipeline.py",
+            "runtime/provider.py",
+            "retrieval/__init__.py",
+            "retrieval/semantic.py",
+            "agent.py",
+            "retrieval/fusion.py",
+            "frontmatter.py",
+            "__main__.py",
+            "runtime/trace.py"
+          ],
+          "relevant": [
+            "memory.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 150.2
+        },
+        "q13": {
+          "query": "streaming LLM request retry backoff",
+          "difficulty": "medium",
+          "retrieved": [
+            "runtime/provider.py",
+            "agent.py",
+            "ui.py",
+            "runtime/runtime.py",
+            "runtime/tools.py",
+            "runtime/trace.py",
+            "prompt.py",
+            "tools.py",
+            "retrieval/context.py",
+            "__main__.py"
+          ],
+          "relevant": [
+            "agent.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 156.6
+        },
+        "q14": {
+          "query": "check_permission 被哪些文件调用",
+          "difficulty": "hard",
+          "retrieved": [
+            "tools.py",
+            "runtime/permissions.py",
+            "retrieval/lexical.py",
+            "agent.py",
+            "retrieval/pipeline.py",
+            "repo/__init__.py",
+            "retrieval/model.py",
+            "repo/store.py",
+            "runtime/registry.py",
+            "repo/graph.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "tools.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 149.9
+        },
+        "q15": {
+          "query": "ToolRegistry 实例化的地方",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/registry.py",
+            "runtime/__init__.py",
+            "runtime/runtime.py",
+            "tools.py",
+            "agent.py",
+            "retrieval/__init__.py",
+            "retrieval/fusion.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "frontmatter.py"
+          ],
+          "relevant": [
+            "runtime/registry.py",
+            "runtime/runtime.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 150.6
+        },
+        "q16": {
+          "query": "EventEmitter 的订阅者",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/events.py",
+            "runtime/__init__.py",
+            "runtime/trace.py",
+            "runtime/runtime.py",
+            "retrieval/__init__.py",
+            "retrieval/fusion.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "tools.py",
+            "frontmatter.py"
+          ],
+          "relevant": [
+            "runtime/events.py",
+            "runtime/trace.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 150.7
+        },
+        "q17": {
+          "query": "RepositoryIndex 的使用者",
+          "difficulty": "hard",
+          "retrieved": [
+            "repo/index.py",
+            "repo/__init__.py",
+            "retrieval/__init__.py",
+            "retrieval/lexical.py",
+            "retrieval/structural.py",
+            "repo/store.py",
+            "retrieval/pipeline.py",
+            "retrieval/model.py",
+            "runtime/registry.py",
+            "repo/graph.py"
+          ],
+          "relevant": [
+            "repo/index.py",
+            "retrieval/pipeline.py",
+            "retrieval/structural.py"
+          ],
+          "metrics": {
+            "recall@5": 0.6666666666666666,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 151.5
+        },
+        "q18": {
+          "query": "AgentConfig 角色档案 from_role",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/config.py",
+            "runtime/runtime.py",
+            "runtime/__init__.py",
+            "runtime/provider.py",
+            "retrieval/pipeline.py",
+            "repo/__init__.py",
+            "retrieval/model.py",
+            "repo/store.py",
+            "runtime/registry.py",
+            "repo/graph.py"
+          ],
+          "relevant": [
+            "runtime/config.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 151.5
+        },
+        "q19": {
+          "query": "工具注册表 registry 的构建",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/runtime.py",
+            "runtime/registry.py",
+            "runtime/__init__.py",
+            "tools.py",
+            "retrieval/__init__.py",
+            "retrieval/fusion.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "frontmatter.py",
+            "retrieval/lexical.py"
+          ],
+          "relevant": [
+            "runtime/registry.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 152.2
+        },
+        "q20": {
+          "query": "find_definition 定位函数定义",
+          "difficulty": "hard",
+          "retrieved": [
+            "repo/index.py",
+            "retrieval/pipeline.py",
+            "repo/__init__.py",
+            "retrieval/model.py",
+            "repo/store.py",
+            "runtime/registry.py",
+            "repo/graph.py",
+            "runtime/trace.py",
+            "memory.py",
+            "runtime/config.py"
+          ],
+          "relevant": [
+            "repo/index.py",
+            "retrieval/structural.py"
+          ],
+          "metrics": {
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 134.0
+        }
+      }
+    },
+    {
+      "method": "hybrid+graph",
+      "aggregate": {
+        "recall@5": 0.8917,
+        "recall@10": 0.9083,
+        "mrr": 0.925,
+        "hit@5": 1.0,
+        "hit@10": 1.0
+      },
+      "by_difficulty": {
+        "easy": {
+          "recall@5": 0.9,
+          "recall@10": 0.9,
+          "mrr": 1.0
+        },
+        "hard": {
+          "recall@5": 0.8333,
+          "recall@10": 0.881,
+          "mrr": 0.9286
+        },
+        "medium": {
+          "recall@5": 0.9375,
+          "recall@10": 0.9375,
+          "mrr": 0.875
+        }
+      },
+      "per_query": {
+        "q01": {
+          "query": "check_permission 权限检查函数",
+          "difficulty": "easy",
+          "retrieved": [
+            "tools.py",
+            "runtime/permissions.py",
+            "retrieval/lexical.py",
+            "agent.py",
+            "runtime/registry.py",
+            "runtime/config.py",
+            "runtime/trace.py",
+            "runtime/budget.py",
+            "retrieval/pipeline.py",
+            "repo/__init__.py"
+          ],
+          "relevant": [
+            "tools.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 112.8
+        },
+        "q02": {
+          "query": "save_session 会话保存",
+          "difficulty": "easy",
+          "retrieved": [
+            "session.py",
+            "agent.py",
+            "repo/store.py",
+            "repo/__init__.py",
+            "repo/graph.py",
+            "repo/scanner.py",
+            "repo/index.py",
+            "retrieval/pipeline.py",
+            "retrieval/model.py",
+            "runtime/registry.py"
+          ],
+          "relevant": [
+            "session.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 112.8
+        },
+        "q03": {
+          "query": "SKILL.md 技能文件解析",
+          "difficulty": "easy",
+          "retrieved": [
+            "skills.py",
+            "__main__.py",
+            "tools.py",
+            "memory.py",
+            "agent.py",
+            "autonomy.py",
+            "ui.py",
+            "prompt.py",
+            "runtime/permissions.py",
+            "subagent.py"
+          ],
+          "relevant": [
+            "frontmatter.py",
+            "skills.py"
+          ],
+          "metrics": {
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 113.7
+        },
+        "q04": {
+          "query": "MCP 客户端连接与调用",
+          "difficulty": "easy",
+          "retrieved": [
+            "mcp_client.py",
+            "__main__.py",
+            "agent.py",
+            "retrieval/__init__.py",
+            "retrieval/fusion.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "tools.py",
+            "frontmatter.py",
+            "runtime/runtime.py"
+          ],
+          "relevant": [
+            "mcp_client.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 112.4
+        },
+        "q05": {
+          "query": "parse_goal_verdict 判决解析",
+          "difficulty": "easy",
+          "retrieved": [
+            "autonomy.py",
+            "agent.py",
+            "retrieval/__init__.py",
+            "retrieval/fusion.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "tools.py",
+            "frontmatter.py",
+            "runtime/runtime.py",
+            "retrieval/lexical.py"
+          ],
+          "relevant": [
+            "autonomy.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 113.1
+        },
+        "q06": {
+          "query": "conversation history persistence to disk",
+          "difficulty": "medium",
+          "retrieved": [
+            "session.py",
+            "runtime/context.py",
+            "agent.py",
+            "__main__.py",
+            "repo/__init__.py",
+            "autonomy.py",
+            "runtime/events.py",
+            "repo/index.py",
+            "tools.py",
+            "prompt.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "session.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 112.1
+        },
+        "q07": {
+          "query": "how to limit agent spending and turns",
+          "difficulty": "medium",
+          "retrieved": [
+            "runtime/budget.py",
+            "agent.py",
+            "runtime/runtime.py",
+            "__main__.py",
+            "retrieval/analyzer.py",
+            "runtime/registry.py",
+            "runtime/trace.py",
+            "autonomy.py",
+            "subagent.py",
+            "runtime/events.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "runtime/budget.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 111.5
+        },
+        "q08": {
+          "query": "repository symbol index incremental update",
+          "difficulty": "medium",
+          "retrieved": [
+            "repo/__init__.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "retrieval/context.py",
+            "repo/store.py",
+            "retrieval/lexical.py",
+            "retrieval/structural.py",
+            "memory.py",
+            "retrieval/fusion.py",
+            "retrieval/pipeline.py"
+          ],
+          "relevant": [
+            "repo/index.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 123.2
+        },
+        "q09": {
+          "query": "role configuration validation rules",
+          "difficulty": "medium",
+          "retrieved": [
+            "runtime/config.py",
+            "runtime/permissions.py",
+            "prompt.py",
+            "autonomy.py",
+            "agent.py",
+            "runtime/runtime.py",
+            "runtime/__init__.py",
+            "tools.py",
+            "repo/scanner.py",
+            "subagent.py"
+          ],
+          "relevant": [
+            "runtime/config.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 128.4
+        },
+        "q10": {
+          "query": "spawn sub agent for independent tasks",
+          "difficulty": "medium",
+          "retrieved": [
+            "subagent.py",
+            "prompt.py",
+            "ui.py",
+            "runtime/permissions.py",
+            "mcp_client.py",
+            "runtime/runtime.py",
+            "tools.py",
+            "repo/symbols.py",
+            "__main__.py",
+            "runtime/context.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "subagent.py"
+          ],
+          "metrics": {
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 125.6
+        },
+        "q11": {
+          "query": "terminal colored output UI rendering",
+          "difficulty": "medium",
+          "retrieved": [
+            "ui.py",
+            "runtime/events.py",
+            "runtime/runtime.py",
+            "runtime/budget.py",
+            "prompt.py",
+            "tools.py",
+            "agent.py",
+            "autonomy.py",
+            "__main__.py",
+            "subagent.py"
+          ],
+          "relevant": [
+            "ui.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 120.3
+        },
+        "q12": {
+          "query": "memory recall semantic selection",
+          "difficulty": "medium",
+          "retrieved": [
+            "memory.py",
+            "retrieval/pipeline.py",
+            "runtime/provider.py",
+            "retrieval/__init__.py",
+            "retrieval/semantic.py",
+            "agent.py",
+            "retrieval/fusion.py",
+            "frontmatter.py",
+            "__main__.py",
+            "runtime/trace.py"
+          ],
+          "relevant": [
+            "memory.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 120.1
+        },
+        "q13": {
+          "query": "streaming LLM request retry backoff",
+          "difficulty": "medium",
+          "retrieved": [
+            "runtime/provider.py",
+            "agent.py",
+            "ui.py",
+            "runtime/runtime.py",
+            "runtime/tools.py",
+            "runtime/trace.py",
+            "prompt.py",
+            "tools.py",
+            "retrieval/context.py",
+            "runtime/registry.py"
+          ],
+          "relevant": [
+            "agent.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 119.4
+        },
+        "q14": {
+          "query": "check_permission 被哪些文件调用",
+          "difficulty": "hard",
+          "retrieved": [
+            "tools.py",
+            "runtime/permissions.py",
+            "retrieval/lexical.py",
+            "agent.py",
+            "runtime/registry.py",
+            "runtime/config.py",
+            "runtime/trace.py",
+            "runtime/budget.py",
+            "retrieval/pipeline.py",
+            "repo/__init__.py"
+          ],
+          "relevant": [
+            "agent.py",
+            "tools.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 120.7
+        },
+        "q15": {
+          "query": "ToolRegistry 实例化的地方",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/registry.py",
+            "runtime/__init__.py",
+            "runtime/runtime.py",
+            "tools.py",
+            "agent.py",
+            "runtime/tools.py",
+            "runtime/events.py",
+            "runtime/budget.py",
+            "runtime/context.py",
+            "retrieval/__init__.py"
+          ],
+          "relevant": [
+            "runtime/registry.py",
+            "runtime/runtime.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 119.6
+        },
+        "q16": {
+          "query": "EventEmitter 的订阅者",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/events.py",
+            "runtime/__init__.py",
+            "runtime/trace.py",
+            "runtime/runtime.py",
+            "runtime/budget.py",
+            "runtime/tools.py",
+            "runtime/context.py",
+            "retrieval/__init__.py",
+            "retrieval/fusion.py",
+            "repo/index.py"
+          ],
+          "relevant": [
+            "runtime/events.py",
+            "runtime/trace.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 118.6
+        },
+        "q17": {
+          "query": "RepositoryIndex 的使用者",
+          "difficulty": "hard",
+          "retrieved": [
+            "repo/index.py",
+            "repo/__init__.py",
+            "retrieval/__init__.py",
+            "repo/store.py",
+            "retrieval/lexical.py",
+            "retrieval/structural.py",
+            "repo/graph.py",
+            "repo/scanner.py",
+            "repo/parser.py",
+            "repo/symbols.py"
+          ],
+          "relevant": [
+            "repo/index.py",
+            "retrieval/pipeline.py",
+            "retrieval/structural.py"
+          ],
+          "metrics": {
+            "recall@5": 0.3333333333333333,
+            "recall@10": 0.6666666666666666,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 119.9
+        },
+        "q18": {
+          "query": "AgentConfig 角色档案 from_role",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/config.py",
+            "runtime/runtime.py",
+            "runtime/__init__.py",
+            "runtime/provider.py",
+            "agent.py",
+            "runtime/registry.py",
+            "runtime/trace.py",
+            "retrieval/pipeline.py",
+            "repo/__init__.py",
+            "retrieval/model.py"
+          ],
+          "relevant": [
+            "runtime/config.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 119.5
+        },
+        "q19": {
+          "query": "工具注册表 registry 的构建",
+          "difficulty": "hard",
+          "retrieved": [
+            "runtime/runtime.py",
+            "runtime/registry.py",
+            "runtime/__init__.py",
+            "tools.py",
+            "retrieval/__init__.py",
+            "retrieval/fusion.py",
+            "repo/index.py",
+            "repo/symbols.py",
+            "frontmatter.py",
+            "retrieval/lexical.py"
+          ],
+          "relevant": [
+            "runtime/registry.py"
+          ],
+          "metrics": {
+            "recall@5": 1.0,
+            "recall@10": 1.0,
+            "mrr": 0.5,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 117.4
+        },
+        "q20": {
+          "query": "find_definition 定位函数定义",
+          "difficulty": "hard",
+          "retrieved": [
+            "repo/index.py",
+            "repo/__init__.py",
+            "repo/store.py",
+            "repo/graph.py",
+            "repo/scanner.py",
+            "retrieval/pipeline.py",
+            "repo/parser.py",
+            "repo/symbols.py",
+            "retrieval/model.py",
+            "runtime/registry.py"
+          ],
+          "relevant": [
+            "repo/index.py",
+            "retrieval/structural.py"
+          ],
+          "metrics": {
+            "recall@5": 0.5,
+            "recall@10": 0.5,
+            "mrr": 1.0,
+            "hit@5": 1.0,
+            "hit@10": 1.0
+          },
+          "ms": 120.3
+        }
+      }
+    }
+  ]
+}

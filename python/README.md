@@ -84,6 +84,39 @@ idx.graph.topological_order()                # 依赖优先拓扑序（无环时
 自动忽略 `.git / node_modules / venv / .venv / dist / build / __pycache__ /
 vendor / generated` 目录与 >1MB 文件；语法错误文件照常抽取有效区域的符号。
 
+## RepoPilot Hybrid Retrieval + Context（Phase 3）
+
+`mini_claude/retrieval/` 把需求文本转成"该看哪些代码"：词法（BM25）、语义
+（LSA）、结构（符号匹配 + 依赖图 1/2-hop 扩展）三路检索经 RRF 融合与重排，
+再用 Token-aware Context Builder 装进预算内的 LLM 上下文：
+
+```python
+from mini_claude.repo import RepositoryIndex
+from mini_claude.retrieval import HybridRetriever
+
+idx = RepositoryIndex("/path/to/repo")
+idx.build()
+
+hybrid = HybridRetriever(idx)
+hits = hybrid.retrieve("check_permission 权限检查在哪里", top_k=10)
+# -> [RetrievalHit(file_path, score, sources, symbols), ...]
+
+context = hybrid.build_context("怎么限制 agent 的花费", token_budget=4000)
+```
+
+Benchmark（20 条手工标注查询，语料 = mini_claude 自身 40 文件）：
+
+```bash
+python tests/benchmark/retrieval_benchmark.py
+# method        Recall@5  Recall@10  MRR
+# grep            0.8167     0.8833  0.7396
+# semantic        0.9083     0.9250  0.7625
+# hybrid          0.9083     0.9250  0.9250
+# hybrid+graph    0.8917     0.9083  0.9250
+```
+
+原始逐查询结果保存在 `tests/benchmark/results/retrieval_benchmark.json`。
+
 ## 依赖
 
 - `anthropic` — Anthropic SDK（流式）
