@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable
 
 from ..planning import Requirement, RequirementParser
@@ -36,6 +37,12 @@ class TeamConfig:
     max_cost_usd: float | None = None
     max_turns: int | None = None
     interactive: bool = False
+    # Phase 6: bind the team to a task worktree (WorktreeInfo from the
+    # WorktreeManager). When set, every role runs with its cwd in the
+    # worktree and git_diff/git_log/run_tests read that checkout — so the
+    # team's file writes and diffs can never touch the main workspace.
+    # None keeps the Phase 5 behavior (cwd = index root).
+    worktree: Any | None = None
 
 
 @dataclass
@@ -82,11 +89,16 @@ class TeamRunner:
         if isinstance(requirement, str):
             requirement = RequirementParser().parse(requirement)
         mailbox = ArtifactMailbox()
-        registry = self._registry or build_role_registry(self.config.index, mailbox)
+        # Phase 6: when a worktree is bound, the whole team operates inside
+        # it — file tools write there and the repo tools read its git state.
+        worktree = self.config.worktree
+        cwd = Path(worktree.path) if worktree is not None else Path(self.config.index.root)
+        registry = self._registry or build_role_registry(
+            self.config.index, mailbox, git_root=cwd)
         result = TeamResult(requirement=requirement)
 
         previous_cwd = os.getcwd()
-        os.chdir(self.config.index.root)
+        os.chdir(cwd)
         try:
             for role in ROLE_NAMES:
                 outcome = await self._run_role(role, registry, mailbox, result)

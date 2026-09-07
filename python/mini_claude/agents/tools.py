@@ -7,6 +7,7 @@ lets an agent hand structured output to the pipeline."""
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 from ..retrieval import SemanticRetriever
 from ..runtime import Tool, ToolRegistry
@@ -30,10 +31,15 @@ def _format_symbols(symbols) -> str:
     return "\n".join(lines)
 
 
-def make_repo_tools(index) -> list[Tool]:
+def make_repo_tools(index, git_root=None) -> list[Tool]:
     """Tools backed by the Phase 2 RepositoryIndex (+ git for logs/diffs).
-    All of them are read-only; they never modify the repository."""
-    root = index.root
+    All of them are read-only; they never modify the repository.
+
+    ``git_root`` (default: the index root) is where git and shell commands
+    run and where files are read from — Phase 6 binds it to a task's
+    worktree so git_diff/git_log/run_tests see exactly that task's state.
+    Symbol/dependency search still serves the index snapshot."""
+    root = Path(git_root) if git_root is not None else index.root
     semantic_cache: dict[str, SemanticRetriever] = {}
 
     def symbol_search(inp: dict) -> str:
@@ -69,7 +75,11 @@ def make_repo_tools(index) -> list[Tool]:
     def git_diff(inp: dict) -> str:
         stat = _run_git(["diff", "--stat"], root)
         full = _run_git(["diff"], root)
-        return f"{stat}\n\n{full}" if full.strip() else "No changes in the working tree."
+        # _run_git maps an empty (successful) git output to its "(no output)"
+        # sentinel — treat that as an empty diff, not as text to show.
+        if full in ("", "(no output)"):
+            return "No changes in the working tree."
+        return f"{stat}\n\n{full}"
 
     def run_tests(inp: dict) -> str:
         command = str(inp.get("command") or "python -m pytest -q")

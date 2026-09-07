@@ -5,10 +5,10 @@
 
 ## Project Status
 
-Current Phase: Phase 5（Multi-Agent）
+Current Phase: Phase 6（Git Worktree Isolation）
 Overall Status: IN_PROGRESS
 Integration Branch: repopilot-dev
-Last Updated: 2026-09-06
+Last Updated: 2026-09-07
 
 | Phase | Module | Branch | Status | Tests | Remote Push |
 |------|------|------|------|------|------|
@@ -18,6 +18,7 @@ Last Updated: 2026-09-06
 | 3 | Hybrid Retrieval + Context | feat/phase-03-hybrid-retrieval | COMPLETED | 207/207 PASS | PASS |
 | 4 | Requirement + Task DAG | feat/phase-04-task-dag | COMPLETED | 280/280 PASS | PASS |
 | 5 | Multi-Agent | feat/phase-05-multi-agent | COMPLETED | 312/312 PASS | PASS |
+| 6 | Git Worktree Isolation | feat/phase-06-worktree | COMPLETED | 334/334 PASS | PASS |
 
 ---
 
@@ -1139,3 +1140,217 @@ Integration:
   `AgentArtifact/Mailbox`、`build_role_runtime/role_acl`、
   `make_repo_tools/make_publish_tool`。
 - 限制：单团队单线程序列执行；artifact 不持久化（内存 mailbox）。
+
+---
+
+## Phase 6：Git Worktree Isolation
+
+### 1. 开发目标
+
+按文档要求实现 Coding Task 的四独立：**独立 Branch + 独立 Worktree +
+独立 Working Directory + 独立 Git Diff**。两个无依赖 Coding Task 并行时
+互不污染 filesystem state；合并冲突可检测且**禁止暴力覆盖**；清理操作
+默认不破坏未合并/未提交的工作。并把 Phase 5 的进程级 cwd 切换升级为
+worktree 绑定。
+
+### 2. 实现内容
+
+新增 `mini_claude/worktree/` 包（2 个模块，约 420 行）：
+
+- **WorktreeManager**：一个仓库一个管理器。任务工作树统一放在
+  `<repo>/worktrees/task-<id>/`（文档示例结构），任务分支统一命名为
+  `task/<id>`。每个任务创建时记录元数据（task_id/branch/path/
+  base_commit）到仓库自身的 `.git/repopilot/worktrees/<id>.json`
+  ——放在 .git 内，永不进入任何任务 diff。
+- **创建守卫（Task Branch / Worktree Creation）**：task_id 白名单正则 +
+  `git check-ref-format --branch` 双重校验（非法分支名直接拒绝且零残留）；
+  分支已存在 / 任务重复 / worktree 路径已存在 / 主工作区脏（可关）——
+  全部在任何副作用发生前拒绝。
+- **Diff Collection**：`diff(task_id)` 返回 TaskDiff（相对 base 的
+  tracked 变更文件 + untracked 新文件 + patch + stat），全部在该任务
+  自己的 worktree 内计算——并行任务各自 diff 互不可见。
+- **Commit**：`commit(task_id, message)` = `git add -A`（新文件属于任务
+  产出）+ 提交，返回 hash；无变更时抛 NothingToCommitError，绝不静默
+  假提交。
+- **Merge + Conflict Detection**：`merge(task_id, target)` 在**主工作区**
+  以 `--no-ff` 合入目标分支（任务保持可识别单元）；冲突时 `git merge
+  --abort` 回滚并抛 WorktreeConflictError（携带冲突文件列表），abort 后
+  再断言主工作区干净——**字节级原样恢复，绝不覆盖任何一方代码**。
+  `detect_conflicts(task_id, target)` 在一次性 detached scratch worktree
+  中预演合并，冲突检测不碰主工作区与任务工作树。
+- **Cleanup**：`cleanup(task_id, force=False)` 删除工作树 + 分支 +
+  元数据；**默认零破坏**：工作树脏（有未提交改动）→ 拒绝；分支有未合入
+  主 HEAD 的提交 → 先于一切副作用拒绝（原子性）；force=True 才显式丢弃。
+  容忍人工已删目录（补完分支+元数据清理）。
+- **TeamRunner 绑定（向后兼容）**：TeamConfig 新增 `worktree` 字段
+  （默认 None = Phase 5 原行为）；设置后整个团队 cwd 进入 worktree，
+  角色仓库工具（git_diff/git_log/run_tests/run_lint/semantic 文件读取）
+  全部以 worktree 为 git_root——coder 的写与 diff 与 worktree 完全对接。
+
+### 3. 新增文件
+
+| 文件 | 作用 |
+|------|------|
+| `python/mini_claude/worktree/__init__.py` | 包导出 |
+| `python/mini_claude/worktree/manager.py` | WorktreeManager + 5 种 dataclass/异常 |
+| `python/tests/worktree/test_manager.py` | 管理器测试（20 例，全部真实 git 仓库） |
+| `python/tests/worktree/test_team_worktree.py` | TeamRunner 绑定集成测试（2 例） |
+
+### 4. 修改文件
+
+| 文件 | 修改 | 接口影响 |
+|------|------|----------|
+| `python/mini_claude/agents/tools.py` | `make_repo_tools(index, git_root=None)`；修复 git_diff 把 "(no output)" 哨兵当 diff 文本的 Phase 5 遗留 bug | 向后兼容 |
+| `python/mini_claude/agents/roles.py` | `build_role_registry(index, mailbox, git_root=None)` | 向后兼容 |
+| `python/mini_claude/agents/team.py` | TeamConfig 增加 `worktree` 字段（默认 None）；run() 绑定 worktree 为 cwd + git_root | 向后兼容 |
+
+### 5. 核心设计
+
+```
+                     WorktreeManager (主工作区内的唯一管理入口)
+┌────────────────────────────┬────────────────────────────────────────┐
+│ create("T001")             │  worktrees/                            │
+│   task/T001 ──► worktrees/ │  ├── task-T001/   ← coder 写、pytest 跑│
+│                  task-T001 │  ├── task-T002/   ← 互不可见           │
+│ create("T002")             │  └── (scratch: detect_conflicts 预演) │
+│   task/T002 ──► worktrees/ │                                        │
+│                  task-T002 │  主工作区 git status 始终干净：          │
+│                            │  .git/info/exclude += /worktrees/      │
+│ diff("T001")               │                                        │
+│   = 仅 task-T001 内变更    │  元数据: .git/repopilot/worktrees/*.json│
+│ merge("T001","main")       │  （永不进入任务 diff）                  │
+│   冲突 → abort + 断言干净  │                                        │
+│   干净 → --no-ff 合入      │                                        │
+│ cleanup("T001")            │  默认: 脏/未合入 → 原子拒绝             │
+└────────────────────────────┴────────────────────────────────────────┘
+```
+
+安全规则（对应文档"禁止冲突时暴力覆盖代码"）：
+
+1. merge 冲突 → abort 回滚 + WorktreeConflictError（携带文件列表），主
+   工作区字节级原样；
+2. cleanup 默认拒绝脏工作树（未提交改动会丢失）与未合入分支（提交会
+   丢失），force=True 才显式丢弃；
+3. cleanup 只触碰本管理器元数据登记过的工作树/分支；
+4. detect_conflicts 的 scratch worktree 是管理器私有的一次性目录，
+   强制删除只作用于它自身。
+
+### 6. 测试
+
+新增 22 例（`tests/worktree/`，全部真实 git 仓库临时目录，无 mock）：
+
+- **双 worktree 并行隔离**（文档必须项）：T001/T002 同时创建，分别改
+  不同文件——主仓库文件内容不变、对方 worktree 文件内容不变、新文件不
+  外溢；diff(T001).files == ["a.py"] 且 patch 只含自己的改动；主工作区
+  `git status` 全程干净。
+- **merge conflict detection**（文档必须项）：双方改同一行 → merge 抛
+  WorktreeConflictError(files=["a.py"])，主内容无冲突标记、HEAD 不动、
+  工作区干净；detect_conflicts 预演报告同一文件且零副作用、scratch 无
+  残留；干净合并路径验证 --no-ff 双亲合并提交。
+- **dirty workspace**（文档必须项）：主工作区脏 → create/merge 均拒绝
+  （WorktreeDirtyError）；恢复干净后成功。
+- **invalid branch**（文档必须项）：`"bad name!"`/`"a..b"`/`"a/b"`/
+  `"-leading"` 全部拒绝且零残留（无分支/无目录/无元数据）；分支已存在、
+  任务重复也拒绝。
+- **cleanup**（文档必须项）：干净清理（合并后）删除工作树+分支+元数据；
+  脏工作树无 force 拒绝且改动完好；未合入分支无 force 原子拒绝（工作树
+  与分支都保留）；force 显式丢弃；cleanup_all；人工删目录后补完清理。
+- **TeamRunner 绑定**：绑定 worktree 后 coder 的相对路径写入落在
+  worktree 内、主仓库无新文件、cwd 恢复；git_diff 工具读 worktree 状态
+  （主仓库 registry 显示 "No changes in the working tree."）。
+
+### 7. 验证结果
+
+单元测试（真实命令与真实数字）：
+
+```text
+$ /data/PR/venv/bin/python -m pytest python/tests/worktree/ -q
+22 passed in 6.51s
+
+$ /data/PR/venv/bin/python -m pytest python/tests/ -q
+334 passed in 9.79s        ← 全量回归（312 旧 + 22 新，零回归）
+```
+
+真实仓库端到端验证（在 /data/PR/RepoPilot 本仓库执行，真实输出）：
+
+```text
+created: branch=task/DEMO path=task-DEMO base=ebfa52c3
+scratch written: scratch_demo.py
+diff.files=[] diff.untracked=['scratch_demo.py']
+status: clean=False changes=['?? scratch_demo.py']
+cleanup without force refused: WorktreeDirtyError
+cleanup(force=True): done
+worktree list after cleanup: /data/PR/RepoPilot 7fb8a80 [feat/phase-06-worktree]
+task branches left: ''
+main workspace status: ''
+registered tasks left: []
+```
+
+创建（base=repopilot-dev）→ diff 收集（untracked 正确报告）→ 脏清理被
+拒 → force 清理 → 验证零残留（无任务分支、主工作区干净、无元数据、
+worktrees/ 空目录已移除）。全程未产生任何提交。
+
+### 8. Self-Repair
+
+1. **`git branch --merged` 的 `+` 前缀**：worktree 检出的分支在列表中
+   带 `+` 前缀，`lstrip("* ")` 未处理导致已合并分支被误判为"未合入"、
+   cleanup 拒绝。修复：`lstrip("*+ ")`（`*`=当前分支，`+`=linked
+   worktree 检出），并补真实场景回归。
+2. **测试期望错误（自纠）**：最初断言"仅 untracked 文件时 commit 抛
+   NothingToCommitError"，实际 `git add -A` 会把新文件一并提交——新文件
+   属于任务产出，提交是正确语义；修正测试为断言提交成功且新文件转入
+   tracked diff。
+3. **Phase 5 遗留 bug**：`_run_git` 对空输出返回 "(no output)" 哨兵，
+   git_diff 的 `full.strip()` 恒为真 → "No changes in the working
+   tree." 分支永远不可达。集成测试暴露后修复：把哨兵视为空 diff。
+
+### 9. Git 信息
+
+Branch：`feat/phase-06-worktree`（自 repopilot-dev ebfa52c 分叉）
+
+| Commit | 内容 |
+|--------|------|
+| ec28deb | feat(worktree): WorktreeManager with task branches and worktree creation |
+| 681d993 | feat(worktree): task diff collection and commit |
+| 0692e77 | feat(worktree): merge with conflict detection and no-force guarantee |
+| ad52ce4 | feat(worktree): cleanup with safe-delete guards |
+| 7fb8a80 | feat(agents): optional worktree binding for TeamRunner |
+| 57d4080 | docs(phase-06): record worktree isolation results |（本文档） |
+| （待定） | feat(phase-06): merge worktree isolation into repopilot-dev |
+
+Push：`origin/feat/phase-06-worktree` → 合并 `repopilot-dev` → 集成回归
+（全量 334）→ Push `origin/repopilot-dev`。
+
+### 10. 当前模块最终实现能力
+
+- `WorktreeManager(root)`：create/get/list/status/diff/commit/
+  detect_conflicts/merge/cleanup/cleanup_all 十个公开操作；
+- 四独立保证：branch（task/<id>）/ worktree（worktrees/task-<id>）/
+  working directory（git 原生 checkout）/ diff（相对 base 的 TaskDiff）；
+- 冲突零覆盖：merge abort + 干净断言；冲突预演（detect_conflicts）
+  零副作用；
+- 清理零破坏默认：脏/未合入原子拒绝，force 显式放行；
+- TeamRunner.worktree 一键绑定（默认 None 完全兼容 Phase 5）。
+
+### 11. 已知问题
+
+- 主工作区 merge 需要调用方先 checkout 目标分支且保持干净（merge()
+  显式断言两者并给出指引），尚未实现自动切换/暂存。
+- 任务 worktree 内的 uncommitted 变更无法自动带入 merge（需要调用方
+  commit 后再 merge；NothingToCommitError 会明确提示）。
+- `.git/info/exclude` 是仓库本地配置，clone 后不携带（合理：worktrees/
+  本就不该进仓库）。
+- worktree 元数据在 `.git/repopilot/` 下，`git worktree prune` 之外的
+  手工删目录场景已容错，但跨进程并发创建同一 task 仍靠元数据文件唯一性
+  兜底（无锁）。
+
+### 12. 下一阶段依赖
+
+- Phase 7（Verification + Self-Repair）直接复用：任务 worktree 内的
+  run_tests/run_lint 已是 worktree 绑定的真实命令；Verification Pipeline
+  的 Code Change 输入就是 TaskDiff / worktree diff。
+- 已稳定接口：`WorktreeManager(root)` 十操作、`WorktreeInfo/TaskDiff/
+  MergeResult/WorktreeStatus`、`TeamConfig.worktree`。
+- 待后续集成：TaskDAG Scheduler（Phase 4）驱动多任务并行 worktree
+  （当前 TeamRunner 单团队单任务）；Phase 7 的 VerificationFailure 流
+  需要把 tester 输出接回 worktree 修复循环。
