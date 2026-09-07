@@ -1,0 +1,7 @@
+[project]
+name = "bug_repo"
+version = "0.1.0"
+description = "Sample repository with one injected, easily fixable bug (Phase 7 fixture)."
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
