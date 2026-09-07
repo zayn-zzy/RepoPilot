@@ -50,13 +50,14 @@ class AgentRuntime:
         *,
         registry: ToolRegistry | None = None,
         events: EventEmitter | None = None,
+        acl: ToolACL | None = None,
     ):
         config.validate()
         self.config = config
         self.events = events or EventEmitter()
         self.trace = Trace().attach(self.events)
         self.registry = registry if registry is not None else build_default_registry()
-        self.acl = ToolACL(
+        self.acl = acl if acl is not None else ToolACL(
             read_only=config.read_only,
             allowed_tools=config.tool_names,
             permission_mode=config.permission_mode,

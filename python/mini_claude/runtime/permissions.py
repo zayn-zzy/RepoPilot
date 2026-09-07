@@ -30,6 +30,7 @@ class ToolACL:
         denied_tools: Iterable[str] | None = None,
         permission_mode: str = "default",
         plan_file_path: str | None = None,
+        read_safe_tools: Iterable[str] | None = None,
     ):
         self.read_only = read_only
         self.allowed_tools: set[str] | None = (
@@ -40,6 +41,9 @@ class ToolACL:
         )
         self.permission_mode = permission_mode
         self.plan_file_path = plan_file_path
+        # Read-only roles may use extra tools that don't modify anything
+        # (later phases register repo search / git read tools here).
+        self._read_safe = READ_SAFE_TOOLS | set(read_safe_tools or ())
 
     def check(self, tool_name: str, inp: dict) -> dict:
         """Return {"action": "allow"|"deny", "message"} for one tool call.
@@ -47,7 +51,7 @@ class ToolACL:
         semantics, dangerous-command confirmation) has the final say."""
         if self.denied_tools is not None and tool_name in self.denied_tools:
             return {"action": "deny", "message": f"{tool_name} is denied by this agent's tool ACL"}
-        if self.read_only and tool_name not in READ_SAFE_TOOLS:
+        if self.read_only and tool_name not in self._read_safe:
             return {
                 "action": "deny",
                 "message": f"{tool_name} is write-capable and this agent is read-only",
@@ -63,7 +67,7 @@ class ToolACL:
     def _definition_allowed(self, tool_name: str) -> bool:
         if self.denied_tools is not None and tool_name in self.denied_tools:
             return False
-        if self.read_only and tool_name not in READ_SAFE_TOOLS:
+        if self.read_only and tool_name not in self._read_safe:
             return False
         if self.allowed_tools is not None and tool_name not in self.allowed_tools:
             return False
