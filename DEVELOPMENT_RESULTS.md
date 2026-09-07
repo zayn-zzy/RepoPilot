@@ -5,7 +5,7 @@
 
 ## Project Status
 
-Current Phase: Phase 3（Hybrid Retrieval + Context）
+Current Phase: Phase 4（Requirement Understanding + Task DAG）
 Overall Status: IN_PROGRESS
 Integration Branch: repopilot-dev
 Last Updated: 2026-09-06
@@ -16,6 +16,7 @@ Last Updated: 2026-09-06
 | 1 | Agent Runtime | feat/phase-01-agent-runtime | COMPLETED | 72/72 PASS | PASS（2026-09-06 补推） |
 | 2 | Repository Intelligence | feat/phase-02-repository-intelligence | COMPLETED | 143/143 PASS | PASS |
 | 3 | Hybrid Retrieval + Context | feat/phase-03-hybrid-retrieval | COMPLETED | 207/207 PASS | PASS |
+| 4 | Requirement + Task DAG | feat/phase-04-task-dag | COMPLETED | 280/280 PASS | PASS |
 
 ---
 
@@ -771,3 +772,158 @@ Integration:
   `RepositoryIndex` 全部查询、`estimate_tokens`。
 - 限制：retrieve 为同步接口（无 LLM 参与，完全确定性）；
   Context Builder 只组装文件级上下文（符号级组装留待 Phase 5 角色化）。
+
+---
+
+## Phase 4：Requirement Understanding + Task DAG
+
+### 1. 开发目标
+
+把 Phase 3 的"该看哪些代码"升级为"该做什么、按什么顺序做"：解析需求类型
+（Bug/Feature/Refactor/Test/Documentation、GitHub Issue、Stack Trace、
+Test Failure），经 Planner（确定性分解或 LLM 规划）生成**合法的任务 DAG**，
+由状态机 + Scheduler 严格按依赖顺序驱动执行（依赖未完成的任务不可能被
+调度），失败级联阻塞、重试与重规划。为 Phase 5 的 Multi-Agent 编排提供
+任务层的执行引擎。
+
+### 2. 实现内容
+
+新增 `mini_claude/planning/` 包（5 个模块，约 800 行）：
+
+- **Requirement Schema + Parser**：`Requirement(kind/title/description/
+  related_files/stack_trace/frames/test_failure/issue_like)`。分类为五类
+  关键词打分制（中英文关键词，平局按 BUG>FEATURE>REFACTOR>TEST>DOC 优先，
+  无命中默认 FEATURE）；GitHub Issue-like 识别（markdown 结构标记）；
+  Stack Trace 帧解析（`File "..." line N in X` → StackFrame 列表 →
+  related_files）；Test Failure 解析（`FAILED test::case - AssertionError:
+  msg` → failed_tests + assertion_message）。
+- **TaskNode + 状态机**：Task 完整包含文档要求的全部字段（id/title/
+  description/agent_role/dependencies/status/priority/files/budget +
+  attempts/result）。状态机 PENDING→READY→RUNNING→SUCCEEDED|FAILED；
+  FAILED→READY（重试）|BLOCKED（耗尽）；BLOCKED→READY|PENDING（重规划）；
+  非法迁移抛 ValueError（含任务 id 的报错信息）。
+- **TaskDAG + DAGValidator**：add_task（重复 id 拒绝）、dependencies_of/
+  dependents_of、确定性拓扑序（Kahn + 有序队列，依赖优先）、DFS 环检测
+  （容忍悬空依赖——由 validator 单独报告）、validator 聚合报告（重复 id /
+  缺失依赖 / 自依赖 / 环 / 非法状态）。
+- **Scheduler**：只放行"所有依赖已 SUCCEEDED/SKIPPED"的任务
+  （READY 才能 mark_running，否则 DAGError）；失败**传递级联阻塞**
+  （依赖 FAILED/BLOCKED 的 PENDING 任务逐波转 BLOCKED）；重试策略
+  （attempts 计数，max_attempts=3 耗尽后 BLOCKED）；replan（FAILED/
+  BLOCKED/SKIPPED 重置为 PENDING）；`async execute(executor)` 驱动整图。
+- **Planner**：确定性规划（每类需求一条角色链：Feature=coder→tester→
+  reviewer 等）+ LLM 规划（PLANNER_SYSTEM 提示词要求纯 JSON 任务规格；
+  解析 → TaskNode 转换 → validator 校验，任何结构违规抛 PlannerError——
+  调用方回退确定性规划）。字段与 Phase 1 的 5 个角色对齐
+  （explorer/coder/tester/reviewer + planner 自身）。
+
+### 3. 新增文件
+
+| 文件 | 作用 |
+|------|------|
+| `python/mini_claude/planning/requirement.py` | Requirement 模型 + Parser（分类/Issue/StackTrace/TestFailure） |
+| `python/mini_claude/planning/task.py` | TaskNode / TaskStatus 状态机 / TaskBudget |
+| `python/mini_claude/planning/dag.py` | TaskDAG + DAGValidator + Scheduler（重试/重规划） |
+| `python/mini_claude/planning/planner.py` | Planner（确定性 + LLM，提示词 + JSON 解析） |
+| `python/tests/planning/test_requirement.py` | 需求解析测试（16 例） |
+| `python/tests/planning/test_task.py` | 状态机测试（11 例） |
+| `python/tests/planning/test_dag.py` | DAG/验证器测试（12 例） |
+| `python/tests/planning/test_scheduler.py` | 调度器测试（15 例） |
+| `python/tests/planning/test_planner.py` | Planner 测试（19 例，含 mock LLM） |
+
+### 4. 修改文件
+
+无（纯新增模块；零改动既有代码）。
+
+### 5. 核心设计
+
+```
+Requirement 文本
+  ├─ RequirementParser: 分类 + 结构化抽取（frames/failed_tests/related_files）
+  ├─ Planner.plan():            确定性角色链（无 LLM，永远合法）
+  └─ Planner.plan_with_llm():   PLANNER_SYSTEM 提示词 → JSON 规格
+                                  → TaskNode 转换 → DAGValidator 校验
+TaskDAG（状态机驱动的节点集）
+  ├─ Scheduler.available():     仅 READY（全部依赖 SUCCEEDED/SKIPPED）
+  ├─ Scheduler.complete():      SUCCEEDED → 新依赖满足者晋级 READY
+  │                             FAILED → 传递级联 BLOCKED → retry（≤3 次）
+  └─ replan():                  失败/阻塞/跳过 → PENDING，重新调度
+```
+
+### 6. 测试
+
+```bash
+/data/PR/venv/bin/python -m pytest python/tests/planning/ -v   # 73 passed
+/data/PR/venv/bin/python -m pytest python/tests/ -q           # 280 passed
+```
+
+### 7. 验证结果
+
+PASS
+
+```
+Planning Unit Tests: 73/73 PASS
+Full Regression:     280/280 PASS（Phase 0-3 全部回归）
+验收：复杂 Feature（GitHub Issue 格式，真实 LLM 规划）→ 7 任务合法 DAG：
+  T001 explorer → {T002, T003, T004} coder 并行 → T005 coder 合并
+  → T006 tester → T007 reviewer；validate PASS、拓扑序合法、
+  Scheduler 仅放行 T001
+```
+
+### 8. Self-Repair
+
+- **失败 1**：确定性规划 `add()` 助手缺 deps 默认值导致 TypeError。修复：
+  默认 None → []。
+- **失败 2**：`find_cycle` 的 DFS 遇到悬空依赖（GHOST）KeyError 崩溃。
+  修复：DFS 跳过图中不存在的依赖（validator 负责报告）。
+- **失败 3**：失败仅阻塞直接依赖者，传递级联缺失（菱形图中 D 未被阻塞）。
+  修复：mark_failed 逐波级联（依赖 FAILED/BLOCKED 的 PENDING 任务 → BLOCKED）。
+- **失败 4**：`TestExecute` 忘了继承 IsolatedAsyncioTestCase——4 个 async
+  测试的协程从未被 await，**静默假 PASS**（unittest 的经典陷阱）。修复：
+  继承修正后 4 个测试真实执行。
+- **失败 5**：开发环境被破坏——`/data/PR/venv`（Python 3.12 + 全部依赖）
+  在开发中途被删除（磁盘 97% 满），系统仅剩 Python 3.10/3.7 且无 sudo。
+  修复：安装 uv（免 root），用 uv 重建 3.12 venv 并装回全部依赖；新
+  anthropic SDK 1.4.0 响应含 thinking block 且默认思考占满 max_tokens——
+  验收调用显式 `thinking={'type':'disabled'}`。
+
+Repair attempts: 5
+
+### 9. Git 信息
+
+（提交后填写）
+
+### 10. 当前模块最终实现能力
+
+1. 使用关键词打分 + 结构化正则，实现五类需求分类与 GitHub Issue /
+   Stack Trace / Test Failure 的结构化抽取。
+2. 使用显式状态机，实现 7 状态任务生命周期与非法迁移检测。
+3. 使用 Kahn 拓扑排序 + DFS 环检测，实现 DAG 合法性验证
+   （重复 id / 缺失依赖 / 环 / 自依赖）。
+4. 使用 READY 门控调度器，实现"依赖全部完成才可执行"的严格约束与
+   失败传递级联阻塞。
+5. 使用 attempts 计数与 replan 重置，实现重试（≤3）与重规划策略。
+6. 使用 LLM Planner 提示词 + 确定性回退，实现复杂 Feature 到合法
+   7 任务 DAG 的自动分解（真实 LLM 验收）。
+
+### 11. 已知问题
+
+- LLM Planner 输出质量依赖模型遵循 JSON 格式的能力（温度 0 + thinking
+  关闭缓解）；不可解析时抛 PlannerError，需调用方回退确定性规划。
+- 确定性规划仅生成线性角色链，不做文件级并行分解（LLM 规划已支持）。
+- replan 不保留失败原因之外的上下文（结果串存于 task.result，Phase 7
+  的 Self-Repair 将消费它）。
+- 开发环境 venv 曾因磁盘压力被删除；已用 uv 重建，但若再次发生需
+  迁到项目内 `.venv` 或容器化。
+
+### 12. 下一阶段依赖
+
+- Phase 5（Multi-Agent）直接复用：TaskNode.agent_role → AgentRuntime
+  （Phase 1 角色档案即任务角色）；Scheduler.execute 的 executor 回调即
+  多 Agent 调度点；AgentArtifact 交换可挂在 task.result 上。
+- 已稳定接口：`Planner.plan/plan_with_llm`、`TaskDAG.validate/
+  topological_order/ready_tasks`、`Scheduler.available/next_ready/
+  complete/execute`、`TaskNode.transition`、`RequirementParser.parse/
+  parse_issue`。
+- 限制：任务级状态未持久化；DAG 不跨进程恢复（Phase 6 worktree /
+  Phase 7 verification 需要时再补）。
