@@ -33,6 +33,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -319,3 +320,70 @@ class WorktreeManager:
             raise WorktreeError(
                 f"commit failed in task {task_id!r}: {(p.stderr or p.stdout).strip()}")
         return self._git(["rev-parse", "HEAD"], info.path)
+
+    # ─── merge + conflict detection ─────────────────────────────
+
+    def detect_conflicts(self, task_id: str, target_branch: str) -> list[str]:
+        """Dry-run: would merging the task branch into ``target_branch``
+        conflict? Runs the merge in a throwaway detached worktree and
+        returns the conflicted file paths ([] = clean merge). The main
+        workspace and the task worktree are never touched."""
+        info = self.get(task_id)
+        target_commit = self._git(["rev-parse", f"{target_branch}^{{commit}}"], self.root)
+        if not self._git_ok(["rev-parse", "--verify", "--quiet", "HEAD"], info.path):
+            raise WorktreeError(f"worktree for task {task_id!r} has no HEAD")
+        self.worktrees_root.mkdir(parents=True, exist_ok=True)
+        scratch = self.worktrees_root / f".merge-scratch-{uuid.uuid4().hex[:8]}"
+        self._git(["worktree", "add", "--detach", str(scratch), target_commit], self.root)
+        try:
+            p = self._run(["merge", "--no-edit", info.branch], scratch)
+            if p.returncode == 0:
+                return []
+            files = [f for f in self._git(
+                ["diff", "--name-only", "--diff-filter=U"], scratch).splitlines() if f.strip()]
+            if files:
+                # Restore the scratch tree so it can be removed without force.
+                self._git(["merge", "--abort"], scratch)
+                return files
+            raise WorktreeError(
+                f"merge probe for task {task_id!r} failed without conflicts: "
+                f"{(p.stderr or p.stdout).strip()}")
+        finally:
+            # The scratch worktree is ours alone — force removal is safe here
+            # and never touches task code.
+            self._run(["worktree", "remove", "--force", str(scratch)], self.root)
+
+    def merge(self, task_id: str, target_branch: str) -> MergeResult:
+        """Merge the task branch into ``target_branch`` in the main
+        workspace (--no-ff, so the task stays a recognizable unit).
+
+        Never force-overwrites: on conflict the merge is aborted and
+        WorktreeConflictError is raised, leaving the main workspace
+        byte-identical to its pre-merge state. Requires a clean main
+        workspace checked out on ``target_branch``."""
+        info = self.get(task_id)
+        self._assert_clean(self.root, "main workspace")
+        current = self._current_branch()
+        if current != target_branch:
+            raise WorktreeError(
+                f"main workspace is on branch {current!r}, not {target_branch!r}; "
+                "check out the target branch first")
+        p = self._run(["merge", "--no-ff", "--no-edit", info.branch], self.root)
+        if p.returncode == 0:
+            return MergeResult(
+                task_id=task_id, target_branch=target_branch, merged=True,
+                commit=self._git(["rev-parse", "HEAD"], self.root))
+        files = [f for f in self._git(
+            ["diff", "--name-only", "--diff-filter=U"], self.root).splitlines() if f.strip()]
+        if not files:
+            raise WorktreeError(
+                f"merge of {info.branch} into {target_branch} failed without conflicts: "
+                f"{(p.stderr or p.stdout).strip()}")
+        # Abort restores the pre-merge index and working tree; the clean
+        # assertion below guarantees nothing was left behind (禁止暴力覆盖).
+        self._git(["merge", "--abort"], self.root)
+        self._assert_clean(self.root, "main workspace")
+        raise WorktreeConflictError(
+            files,
+            f"merge of {info.branch} into {target_branch} conflicts in {len(files)} "
+            f"file(s); the merge was aborted and nothing was changed")

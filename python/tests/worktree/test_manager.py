@@ -186,5 +186,89 @@ class TestParallelIsolation(unittest.TestCase):
         self.assertEqual(_git(self.repo, "status", "--porcelain"), "")
 
 
+class TestMergeAndConflicts(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.repo = _make_repo(Path(self._tmp.name))
+        self.mgr = WorktreeManager(self.repo)
+        self.base = _git(self.repo, "rev-parse", "HEAD")
+
+    def _task_change(self, task_id: str, file: str, content: str) -> str:
+        wt = self.mgr.create(task_id)
+        (wt.path / file).write_text(content)
+        return self.mgr.commit(task_id, f"task {task_id} changes {file}")
+
+    def test_merge_clean_merges_task_into_target(self):
+        self._task_change("T001", "a.py", "def a():\n    return 100\n")
+        result = self.mgr.merge("T001", "main")
+        self.assertTrue(result.merged)
+        self.assertEqual(result.target_branch, "main")
+        # A --no-ff merge commit with two parents advanced main.
+        head = _git(self.repo, "rev-parse", "HEAD")
+        self.assertEqual(result.commit, head)
+        self.assertNotEqual(head, self.base)
+        parents = _git(self.repo, "rev-list", "--parents", "-n1", "HEAD").split()
+        self.assertEqual(len(parents), 3)  # commit + 2 parents
+        # The task's change is now in the main workspace.
+        self.assertIn("return 100", (self.repo / "a.py").read_text())
+        self.assertEqual(_git(self.repo, "status", "--porcelain"), "")
+
+    def test_merge_conflict_never_overwrites(self):
+        """禁止冲突时暴力覆盖代码: the same line edited on both sides must
+        abort the merge and leave the main workspace byte-identical."""
+        self._task_change("T001", "a.py", "def a():\n    return 100  # task one\n")
+        # The main branch edits the same line independently.
+        (self.repo / "a.py").write_text("def a():\n    return 200  # main side\n")
+        _git(self.repo, "add", "a.py")
+        _git(self.repo, "commit", "-qm", "main side edits a.py")
+        main_head = _git(self.repo, "rev-parse", "HEAD")
+
+        with self.assertRaises(WorktreeConflictError) as ctx:
+            self.mgr.merge("T001", "main")
+        self.assertEqual(ctx.exception.files, ["a.py"])
+        # Nothing was overwritten: no conflict markers, main content intact,
+        # main HEAD unmoved, workspace clean again.
+        self.assertEqual((self.repo / "a.py").read_text(),
+                         "def a():\n    return 200  # main side\n")
+        self.assertNotIn("task one", (self.repo / "a.py").read_text())
+        self.assertEqual(_git(self.repo, "rev-parse", "HEAD"), main_head)
+        self.assertEqual(_git(self.repo, "status", "--porcelain"), "")
+
+    def test_merge_refuses_dirty_workspace(self):
+        self._task_change("T001", "a.py", "def a():\n    return 100\n")
+        (self.repo / "b.py").write_text("def b():\n    return 9\n")  # uncommitted
+        with self.assertRaises(WorktreeDirtyError):
+            self.mgr.merge("T001", "main")
+        self.assertEqual(_git(self.repo, "rev-parse", "HEAD"), self.base)
+
+    def test_merge_refuses_wrong_branch(self):
+        self._task_change("T001", "a.py", "def a():\n    return 100\n")
+        _git(self.repo, "checkout", "-q", "master")  # fixture's original branch
+        with self.assertRaises(WorktreeError):
+            self.mgr.merge("T001", "main")
+        _git(self.repo, "checkout", "-q", "main")
+
+    def test_detect_conflicts_reports_files_without_touching_workspace(self):
+        self._task_change("T001", "a.py", "def a():\n    return 100  # task one\n")
+        (self.repo / "a.py").write_text("def a():\n    return 200  # main side\n")
+        _git(self.repo, "add", "a.py")
+        _git(self.repo, "commit", "-qm", "main side edits a.py")
+        main_head = _git(self.repo, "rev-parse", "HEAD")
+
+        conflicts = self.mgr.detect_conflicts("T001", "main")
+        self.assertEqual(conflicts, ["a.py"])
+        # The probe changed nothing anywhere.
+        self.assertEqual(_git(self.repo, "rev-parse", "HEAD"), main_head)
+        self.assertEqual((self.repo / "a.py").read_text(),
+                         "def a():\n    return 200  # main side\n")
+        self.assertEqual(_git(self.repo, "status", "--porcelain"), "")
+        self.assertEqual(_git(self.repo, "worktree", "list").count("worktrees/"), 1)
+
+        # A non-conflicting task probes clean.
+        self._task_change("T002", "b.py", "def b():\n    return 200\n")
+        self.assertEqual(self.mgr.detect_conflicts("T002", "main"), [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
