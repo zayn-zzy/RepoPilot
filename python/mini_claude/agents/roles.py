@@ -80,12 +80,14 @@ ROLE_TOOL_SETS: dict[str, frozenset[str]] = {
 READ_ONLY_ROLES = frozenset({"planner", "explorer", "reviewer"})
 
 
-def build_role_registry(index, mailbox) -> ToolRegistry:
+def build_role_registry(index, mailbox, git_root=None) -> ToolRegistry:
     """A full registry (built-ins + repo tools + publish) for one team. Every
     role agent shares the registry object's content but filters through its
-    own ACL; the registry itself carries the repo-backed tool handlers."""
+    own ACL; the registry itself carries the repo-backed tool handlers.
+    ``git_root`` binds git/shell/file tools to a specific checkout (Phase 6
+    passes the task worktree)."""
     registry = build_default_registry()
-    for tool in make_repo_tools(index):
+    for tool in make_repo_tools(index, git_root=git_root):
         registry.register(tool)
     registry.register(make_publish_tool(mailbox))
     return registry
