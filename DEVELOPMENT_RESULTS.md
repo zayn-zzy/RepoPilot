@@ -5,7 +5,7 @@
 
 ## Project Status
 
-Current Phase: Phase 4（Requirement Understanding + Task DAG）
+Current Phase: Phase 5（Multi-Agent）
 Overall Status: IN_PROGRESS
 Integration Branch: repopilot-dev
 Last Updated: 2026-09-06
@@ -17,6 +17,7 @@ Last Updated: 2026-09-06
 | 2 | Repository Intelligence | feat/phase-02-repository-intelligence | COMPLETED | 143/143 PASS | PASS |
 | 3 | Hybrid Retrieval + Context | feat/phase-03-hybrid-retrieval | COMPLETED | 207/207 PASS | PASS |
 | 4 | Requirement + Task DAG | feat/phase-04-task-dag | COMPLETED | 280/280 PASS | PASS |
+| 5 | Multi-Agent | feat/phase-05-multi-agent | COMPLETED | 312/312 PASS | PASS |
 
 ---
 
@@ -948,3 +949,171 @@ Integration:
   parse_issue`。
 - 限制：任务级状态未持久化；DAG 不跨进程恢复（Phase 6 worktree /
   Phase 7 verification 需要时再补）。
+
+---
+
+## Phase 5：Multi-Agent
+
+### 1. 开发目标
+
+把前四个 Phase 的组件合流：Phase 1 的 AgentRuntime（每实例独立
+Prompt/ACL/Context/Budget）、Phase 2 的 RepositoryIndex、Phase 3 的检索、
+Phase 4 的 Requirement/Scheduler，组成**五角色团队**（Planner / Explorer /
+Coder / Tester / Reviewer）。角色之间禁止自由聊天，唯一通道是结构化
+AgentArtifact；一条固定流水线跑通"需求 → 规划 → 探索 → 编码 → 测试 →
+评审"的最小流程。
+
+### 2. 实现内容
+
+新增 `mini_claude/agents/` 包（5 个模块，约 700 行）：
+
+- **AgentArtifact + ArtifactMailbox**：五种 artifact 类型（plan /
+  exploration / code_change / test_report / review）+ 生产者/时间戳/自增 id，
+  JSON 序列化往返；mailbox 有序存储 + latest(kind) 查询——agent 间交换
+  结构化信息的唯一通道。
+- **仓库工具（8 个新 Tool）**：symbol_search（Phase 2 find_symbol）、
+  dependency_search（依赖/被依赖 + 模块依赖）、semantic_search（Phase 3
+  LSA）、git_log / git_diff（只读 git）、run_tests / run_lint（shell 包装）、
+  parse_failure（Phase 4 TestFailure 解析）、publish_artifact（结构化输出
+  通道，写入 mailbox）。全部走 Phase 1 Tool 接口注册进 registry。
+- **五角色定义**：独立 Prompt（每角色一段，含各自 artifact payload schema）、
+  独立 Tool ACL（与文档权限逐条对齐：planner/explorer/reviewer 只读；
+  explorer 有 read/grep/glob/symbol/dependency/semantic search/git log；
+  coder 有 read/search/edit/write/bash/git diff；tester 有 read/test/lint/
+  build/failure parsing；reviewer 有 read-only/diff/test results/dependency
+  inspection）。每个角色 = 独立 AgentRuntime（独立上下文/预算/事件流）。
+- **TeamRunner**：固定顺序单程管道（Requirement → Planner → Explorer →
+  Coder → Tester → Reviewer）；每角色只看到**之前角色**的 artifact
+  （reviewer 看 plan+code_change+test_report，coder 看 plan+exploration）；
+  前序角色未发布 artifact 则管道提前停止；运行期把进程 cwd 切到仓库根
+  （文件工具按 cwd 相对路径工作），结束恢复——Phase 6 的 worktree 将替换
+  这一粗粒度隔离。
+- **Phase 1 两处向后兼容扩展**：ToolACL 增加 `read_safe_tools` 参数
+  （只读角色可使用新增的只读工具，如 git_diff/symbol_search）；
+  AgentRuntime 增加 `acl` 参数（允许注入角色 ACL）。
+
+### 3. 新增文件
+
+| 文件 | 作用 |
+|------|------|
+| `python/mini_claude/agents/artifact.py` | AgentArtifact + ArtifactMailbox |
+| `python/mini_claude/agents/tools.py` | 8 个仓库/发布工具 + READ_SAFE_REPO_TOOLS |
+| `python/mini_claude/agents/roles.py` | ROLE_PROMPTS / ROLE_TOOL_SETS / build_role_runtime |
+| `python/mini_claude/agents/team.py` | TeamRunner + TeamConfig + TeamResult |
+| `python/tests/agents/test_artifact.py` | artifact 测试（12 例） |
+| `python/tests/agents/test_roles.py` | 角色 ACL 测试（11 例） |
+| `python/tests/agents/test_team.py` | 管道测试（9 例，脚本化 LLM 驱动真实循环） |
+
+### 4. 修改文件
+
+| 文件 | 修改 | 接口影响 |
+|------|------|----------|
+| `python/mini_claude/runtime/permissions.py` | ToolACL 增加 `read_safe_tools` 参数（默认空） | 向后兼容 |
+| `python/mini_claude/runtime/runtime.py` | AgentRuntime 增加 `acl` 参数（默认 None=原行为） | 向后兼容 |
+
+### 5. 核心设计
+
+```
+Requirement ──► Planner ──plan──► Explorer ──exploration──► Coder
+                  │ read-only         │ read-only            │ read+write+shell
+                  ▼                   ▼                      ▼
+              publish_artifact    publish_artifact       publish_artifact
+                    (mailbox)          (mailbox)             (mailbox)
+                                                              │ code_change
+      Reviewer ◄──review── Tester ◄──test_report──(pytest 真实运行)
+      read-only            read+test/lint
+      approve/reject
+
+- 每个角色: AgentRuntime(config: 角色 Prompt + ACL + 预算上限 + 独立事件流)
+- 工具层: 角色 registry = 内置工具 + 仓库工具 + publish_artifact，
+  经 ToolACL 过滤（模型看不到无权工具；运行期调用同样被 ACL 拒绝）
+- TeamRunner.run(): cwd 切换到 index.root（文件工具落点正确），
+  单程固定顺序，前序无 artifact 即停
+```
+
+### 6. 测试
+
+```bash
+/data/PR/venv/bin/python -m pytest python/tests/agents/ -v   # 32 passed
+/data/PR/venv/bin/python -m pytest python/tests/ -q         # 312 passed
+```
+
+### 7. 验证结果
+
+PASS
+
+```
+Agents Unit Tests:  32/32 PASS
+Full Regression:    312/312 PASS
+验收（真实 LLM，五角色最小流程，tmp 仓库副本）：
+  Requirement: 在 pkg/utils.py 添加 multiply(a, b) 并写 pytest 测试
+  roles ran: planner(5 calls) → explorer(8) → coder(10) → tester(5) → reviewer(7)
+  artifacts: plan → exploration → code_change → test_report → review 全部流转
+  真实改动: utils.py 加入 multiply 且保留 add()；coder 还移除了 core↔models
+            循环导入使 pytest 可收集（reviewer 在建议中指出了这一越界改动）
+  tester 真实运行: python -m pytest -q → 1 passed；compileall 通过
+  reviewer: approved=True + 两条高质量建议
+  总成本: $0.24（41 次 LLM 调用，全部计入 Trace）
+  污染检查: 仓库外零文件落盘（cwd 隔离修复后）
+```
+
+### 8. Self-Repair
+
+- **失败 1**：`role_acl` 未继承 permission_mode → 静态引擎对新文件写入返回
+  confirm，coder 的 ACL 允许被 dispatch 层当作拒绝。修复：role_acl 增加
+  permission_mode 参数并随 config 透传。
+- **失败 2**：管道无 review 时 approved 语义错误（False 而非"无裁决"）。
+  修复：None = 未达评审，True/False = 评审员明确决定。
+- **失败 3（重要）**：真实 LLM 验收中 coder 把文件写进了**进程 cwd**
+  （真实仓库被污染：pkg/ 与 tests/ 被创建）。Root Cause：文件工具按 cwd
+  相对路径工作，而索引根是 tmp 仓库。修复：TeamRunner.run 切 cwd 到
+  index.root 并 finally 恢复（Phase 6 worktree 将做真正的每任务隔离）；
+  清理污染文件并补充 cwd 恢复回归测试。
+- **失败 4**：coder 在 12 轮预算内反复探索未发布 artifact，管道按设计
+  提前停止。修复：强化 coder 提示词（"写完立即 publish，不要继续探索"）+
+  验收轮次预算 20。
+- **失败 5**：测试脚本中 3 个角色落进 else 分支拿到 coder 脚本。修复：
+  完整脚本化 5 个角色。
+
+Repair attempts: 5
+
+### 9. Git 信息
+
+（提交后填写）
+
+### 10. 当前模块最终实现能力
+
+1. 使用 AgentArtifact + ArtifactMailbox，实现五角色间结构化信息交换
+   （禁止自由聊天，单程固定顺序）。
+2. 使用 Phase 1 Tool 接口，实现 8 个角色工具（符号/依赖/语义检索、
+   git log/diff、测试/检查/失败解析、artifact 发布）。
+3. 使用每角色独立 AgentRuntime，实现独立 Prompt + Tool ACL + Context +
+   Budget（文档权限逐条对齐并测试）。
+4. 使用 TeamRunner 固定管道，实现 Requirement → Planner → Explorer →
+   Coder → Tester → Reviewer 的最小流程（真实 LLM 验收：真实改代码、
+   真实跑测试、真实评审，$0.24 全程 Trace 记录）。
+5. 使用 cwd 切换 + 恢复，实现文件操作落点隔离（临时方案，Phase 6
+   升级为 git worktree）。
+6. 使用脚本化 LLM 驱动真实 Agent 循环，实现 ACL 强制执行、artifact
+   传递、上下文独立、管道早停等 32 项单元测试。
+
+### 11. 已知问题
+
+- cwd 切换是进程级的粗粒度隔离：并发团队运行会互相踩（Phase 6 用
+  git worktree 解决）。
+- 角色 artifact 的 payload schema 靠提示词约束，模型可能不严格遵循
+  （publish_artifact 工具仅校验 kind 与 dict 类型）。
+- TeamRunner 尚未接入 Phase 4 的 TaskDAG Scheduler（当前为固定五角色
+  线性管道）；DAG 驱动的多任务编排留待后续集成。
+- planner 角色的探索工具使用率低（验收中主要靠自身推理），后续可
+  把 Phase 3 HybridRetriever.build_context 注入 planner 提示词。
+
+### 12. 下一阶段依赖
+
+- Phase 6（Git Worktree Isolation）直接复用：TeamRunner 的每角色
+  AgentRuntime + 角色 ACL；把 cwd 切换替换为 worktree 绑定；coder 的
+  git_diff 与 worktree 的 diff 收集对接。
+- 已稳定接口：`TeamRunner(TeamConfig).run(requirement) -> TeamResult`、
+  `AgentArtifact/Mailbox`、`build_role_runtime/role_acl`、
+  `make_repo_tools/make_publish_tool`。
+- 限制：单团队单线程序列执行；artifact 不持久化（内存 mailbox）。
