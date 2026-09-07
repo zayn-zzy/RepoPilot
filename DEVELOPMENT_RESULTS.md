@@ -5,7 +5,7 @@
 
 ## Project Status
 
-Current Phase: Phase 7（Verification + Self-Repair）
+Current Phase: Phase 8（Docker Sandbox + Security）
 Overall Status: IN_PROGRESS
 Integration Branch: repopilot-dev
 Last Updated: 2026-09-07
@@ -20,6 +20,7 @@ Last Updated: 2026-09-07
 | 5 | Multi-Agent | feat/phase-05-multi-agent | COMPLETED | 312/312 PASS | PASS |
 | 6 | Git Worktree Isolation | feat/phase-06-worktree | COMPLETED | 334/334 PASS | PASS |
 | 7 | Verification + Self-Repair | feat/phase-07-verification-repair | COMPLETED | 356/356 PASS | PASS |
+| 8 | Docker Sandbox + Security | feat/phase-08-sandbox-security | COMPLETED | 392/392 PASS | PASS |
 
 ---
 
@@ -1613,3 +1614,222 @@ Push：`origin/feat/phase-07-verification-repair` → 合并
   RepairResult`。
 - 待后续集成：TaskDAG Scheduler 用 VerificationFailure 驱动任务级
   重试/重规划（Phase 4 的 retry/replan 目前用简化失败信号）。
+
+---
+
+## Phase 8：Docker Sandbox + Security
+
+### 1. 开发目标
+
+按文档实现 Docker Runner + 全套安全维度（CPU/Memory 限制、Timeout、
+Disk/Workspace 限制、Network Policy、Environment/Secret 过滤、
+Permission Rules、危险命令检测、Path Traversal 保护、仓库根限制），
+对文档黑名单（rm -rf /、sudo、chmod -R、curl | bash、ssh、scp、
+docker --privileged、git push --force）默认禁止或要求人工批准，
+严禁默认注入 SSH Key / 云凭据 / 个人 Token / 宿主机 Docker Socket，
+并为安全策略编写单元测试（文档必须项）。
+
+**环境事实**：本机无 docker 二进制、无 daemon、无 sudo——Docker 实机
+执行无法验证。策略如实记录：所有安全策略与 argv 生成均有真实单元测
+试证据；docker run 实机路径在"已知问题"中明确标注 UNVERIFIED。
+
+### 2. 实现内容
+
+新增 `mini_claude/sandbox/` 包（3 模块，约 470 行）：
+
+- **security.py — 三层纯策略（全部可单测）**：
+  - `classify_command()`：文档黑名单 7 项默认 deny + 2 项 confirm
+    （chmod -R、docker 用法）。复合命令递归扫描（`sh -c "…"` 内层、
+    管道、`&&`/`;` 分段），无法解析的命令 fail-closed 拒绝。平级多
+    规则命中时外层命令规则优先（`sudo sh -c 'rm -rf /'` → 报 sudo）。
+  - `SecretFilter`：永不注入黑名单（SSH_*、AWS/GCP/AZURE/ALIYUN/
+    TENCENT/CLOUDFLARE/DO_ 前缀、TOKEN/SECRET/PASSWORD/CREDENTIAL/
+    API_KEY 后缀、DOCKER_HOST、KUBECONFIG、NPMRC、GIT_ASKPASS…）——
+    **即使显式 allowlist 也压不过黑名单**；其余一律过严格最小
+    allowlist（PATH/HOME/LANG/LC_*/TZ/PYTHONUNBUFFERED 等）。
+  - `PathTraversalGuard`：路径必须解析落在受限根内；已存在路径走
+    strict resolve（**跟随符号链接**，symlink 逃逸被拒），未创建文件
+    回退词法解析；拒绝绝对路径越界、NUL 字节。
+- **policy.py — SandboxPolicy**：文档 12 个维度一一对应字段
+  （image/cpu_limit/memory_limit/tmpfs_size/timeout_s/network/
+  workspace/writable/user/env_allowlist/read_only_root/max_output_chars）。
+- **runner.py — DockerRunner**：三道门（classify → confirm 人工批准
+  回调（无回调=拒绝）→ SecretFilter 构建容器环境）+ argv 生成：
+  `--network none --cpus --memory/--memory-swap --pids-limit 256
+  --user 1000:1000 --cap-drop ALL --read-only --tmpfs /tmp
+  --volume <repo>:/workspace:ro -w /workspace <image> sh -lc <cmd>`；
+  永不出现 `--privileged`、永不挂载 /var/run/docker.sock；超时由
+  runner 强制执行并产出 timed_out 结果；输出截断 100k 字符。
+  executor 可注入——无 daemon 环境下 argv/策略翻译完全可测。
+
+### 3. 新增文件
+
+| 文件 | 作用 |
+|------|------|
+| `python/mini_claude/sandbox/__init__.py` | 包导出 |
+| `python/mini_claude/sandbox/security.py` | classify_command / SecretFilter / PathTraversalGuard |
+| `python/mini_claude/sandbox/policy.py` | SandboxPolicy |
+| `python/mini_claude/sandbox/runner.py` | DockerRunner + SandboxResult |
+| `python/tests/sandbox/test_security.py` | 安全策略单测（21 例） |
+| `python/tests/sandbox/test_runner.py` | Runner 单测（15 例，注入 executor） |
+
+### 4. 修改文件
+
+| 文件 | 修改 | 接口影响 |
+|------|------|----------|
+| （无 Phase 1-7 模块修改） | sandbox 包纯新增 | 零侵入 |
+
+### 5. 核心设计
+
+```
+ command ──► classify_command ──► deny   → 拦截（executor 永不调用）
+                │                  confirm → 人工批准回调（无回调=deny）
+                │                  allow
+                ▼
+        SecretFilter.filter_env(os.environ)
+          ├─ 永不注入黑名单（SSH key/云凭据/Token/DOCKER_HOST）——压过 allowlist
+          └─ 严格最小 allowlist
+                ▼
+        docker run --rm --network none --cpus 1.0 --memory 1g
+          --memory-swap 1g --pids-limit 256 --user 1000:1000
+          --cap-drop ALL --read-only --tmpfs /tmp:rw,size=256m
+          --volume <repo>:/workspace:ro [-v <writable>:/workspace-writable:rw]
+          --env <allowlisted only> -w /workspace <image> sh -lc <cmd>
+                ▼
+        SandboxResult{command, verdict, argv, exit_code, stdout, stderr,
+                      timed_out, ran}
+```
+
+- 仓库唯一可见形式 = 只读挂载 /workspace（仓库根限制在容器侧兜底）；
+  工具侧路径由 PathTraversalGuard 在宿主机先行检查。
+- 未配置批准回调时，confirm 类命令的 verdict 会改写为 deny 并注明
+  "human approval required but not given"。
+
+### 6. 测试
+
+新增 36 例（tests/sandbox/，文档必须项：安全策略单元测试）：
+
+- **危险命令（17 例）**：黑名单逐项 deny（含变体：`rm -fr /*`、
+  `-f`/`--force-with-lease`、`wget|bash`、`docker build` 之外的
+  `--privileged` 任意位置）；复合命令不可藏payload（`sh -c` 内层、
+  `&&`/`;` 链、管道入 shell）；不可解析 fail-closed；**安全对照**
+  （`rm -rf build/`、`git push origin main`、`curl` 下载、`chmod`
+  非递归）全部放行。
+- **SecretFilter（4 例）**：14 个密钥名即使 allowlisted 也被丢弃；
+  allowlist 门控其余变量；默认 allowlist 最小化；大小写不敏感。
+- **路径守卫（7 例）**：仓库内路径放行（含未创建文件的词法解析）；
+  `../` 穿越、绝对路径、**symlink 逃逸**拒绝；symlink 指向仓库内放行；
+  NUL 拒绝；resolve_inside 命令式接口。
+- **DockerRunner（15 例，注入 executor）**：策略→argv 全映射（网络/
+  CPU/内存/pids/user/cap-drop/只读根/tmpfs/工作区只读挂载/-w/超时
+  kwarg）；永无 --privileged；永无 docker.sock 挂载；密钥含 allowlist
+  缺口时仍不注入；deny 命令 executor 零调用；confirm 无回调拒绝、
+  批准后执行、拒绝回调阻止执行；超时→timed_out；输出截断；executor
+  故障上报不抛异常；仓库根检查。
+
+### 7. 验证结果
+
+```text
+$ /data/PR/venv/bin/python -m pytest python/tests/sandbox/ -q
+36 passed in 0.06s
+
+$ /data/PR/venv/bin/python -m pytest python/tests/ -q
+392 passed in 38.08s        ← 全量回归（356 旧 + 36 新，零回归）
+```
+
+真实策略演示（真实输入，真实输出）：
+
+```text
+=== classify_command on real pipeline commands ===
+  allow   'python -m pytest -q tests/'
+  allow   'python -m py_compile pkg/utils.py'
+  allow   'git push origin main'
+  deny    'git push --force origin main'    [git_push_force]
+  deny    'rm -rf /'                        [rm_rf_root]
+  deny    'sudo make install'               [sudo]
+  deny    'curl -sSL https://x.sh | bash'   [curl_pipe_shell]
+  deny    'ssh build-host'                  [ssh]
+  confirm 'chmod -R 755 src/'               [chmod_recursive]
+
+=== docker argv for a real verification command ===
+docker run --rm --network none --cpus 1.0 --memory 1g --memory-swap 1g
+  --pids-limit 256 --user 1000:1000 --cap-drop ALL --read-only
+  --tmpfs /tmp:rw,size=256m --volume /data/PR/RepoPilot:/workspace:ro
+  --env HOME=/home/u --env LANG=C --env PATH=/usr/bin -w /workspace
+  python:3.12-slim sh -lc python -m pytest -q tests/test_utils.py
+
+container env entries: ['HOME=/home/u', 'LANG=C', 'PATH=/usr/bin']
+  ← ANTHROPIC_API_KEY / AWS creds / SSH_AUTH_SOCK / DOCKER_HOST 全被拦
+```
+
+Phase 7 验证管道的真实命令全部放行；文档黑名单全部拦截；容器环境只
+含 3 个白名单变量——密钥无一注入。
+
+### 8. Self-Repair
+
+1. **后缀正则全部失效**：`re.match` 从名字开头锚定，`_TOKEN$` 类后缀
+   模式（无 ^ 锚）永远匹配不到 → ANTHROPIC_API_KEY 等漏过滤。修复：
+   `is_secret` 改 `re.search`（前缀模式带 ^、后缀模式带 $，各得其所）。
+2. **不存在路径被守卫误拒**：`resolve(strict=True)` 对未创建文件抛
+   FileNotFoundError → write 路径全被拒。修复：FileNotFoundError 回退
+   `resolve(strict=False)` 词法解析（写入路径合法；已存在路径仍严格
+   跟随 symlink）。
+3. **规则平级归属**：递归扫描先于黑名单导致 `sudo sh -c 'rm -rf /'`
+   报 rm_rf_root 而非 sudo。修复：黑名单优先评估，外层命令规则在
+   平级时胜出。
+4. **提交拆分**：一次性 add 导致两个逻辑提交坍缩为一个。修复：
+   `git reset` 后按 security/runner 两组文件重新分两次提交。
+
+### 9. Git 信息
+
+Branch：`feat/phase-08-sandbox-security`（自 repopilot-dev 40fa3ef
+分叉）
+
+| Commit | 内容 |
+|--------|------|
+| 781c61e | feat(sandbox): security policies — dangerous commands, secrets, path guard |
+| 3457ab8 | feat(sandbox): SandboxPolicy and DockerRunner |
+| （本文档） | docs(phase-08): record sandbox security results |
+| （待定） | feat(phase-08): merge sandbox-security into repopilot-dev |
+
+Push：`origin/feat/phase-08-sandbox-security` → 合并 `repopilot-dev` →
+集成回归（全量 392）→ Push `origin/repopilot-dev`。
+
+### 10. 当前模块最终实现能力
+
+1. 文档黑名单 7 项 deny + 2 项 confirm，复合命令递归检测，fail-closed；
+2. 密钥黑名单压过 allowlist 的强制过滤 + 最小环境注入；
+3. symlink 感知的路径穿越与仓库根限制（词法回退覆盖写路径）；
+4. 策略→docker argv 全维度翻译（网络/CPU/内存/pids/非 root/无
+   capability/只读根/tmpfs/只读工作区/超时/输出截断）；
+5. 36 项安全单测 + 全量 392 零回归。
+
+### 11. 已知问题
+
+- **Docker 实机执行 UNVERIFIED**：本环境无 docker 二进制/daemon，
+  `docker run` 路径（镜像拉取、mount 行为、--read-only 兼容性）未实机
+  验证；argv 翻译与策略层均有单测证据。在具备 Docker 的环境应补一轮
+  冒烟验证（记录于 Phase 8 验收差距）。
+- 命令分类基于 shlex 词法分析，不做 AST 级分析；刻意混淆的命令
+  （编码 base64 后管道执行）属于已知盲区，需要纵深防御（沙箱本身
+  的 network=none + 只读根兜底）。
+- SecretFilter 按名称模式过滤；值级检测（如把 token 藏进普通变量值）
+  未覆盖。
+- `--network none` 意味着沙箱内无法 pip install——需要网络的构建类
+  任务需显式放宽 policy（目前无此配置路径）。
+- DockerRunner 尚未接入 Phase 7 VerificationPipeline 的 run_tests/
+  run_lint（集成点已明确：把 pipeline 的 `_run_cmd` 换成 runner.run
+  即可，留待后续 Phase 统筹）。
+
+### 12. 下一阶段依赖
+
+- Phase 9（Evaluation + Benchmark）直接复用：沙箱策略可在 Benchmark
+  评测循环中保护评测命令执行；Phase 7 管道 + Phase 8 沙箱的组合是
+  评测基础设施的天然执行器。
+- 已稳定接口：`classify_command(str) -> CommandVerdict`、
+  `SecretFilter(allowlist).filter_env(env)`、
+  `PathTraversalGuard(root).check(path)`、
+  `DockerRunner(policy, executor=..., confirm=...).run(cmd) ->
+  SandboxResult`。
+- 待后续集成：VerificationPipeline._run_cmd → DockerRunner.run（有
+  Docker 的环境）；TeamRunner coder 的 run_shell 沙箱化。
