@@ -33,6 +33,7 @@ class RepairAttempt:
     outcome_text: str           # the coder's final text (diagnosis/fix note)
     re_test: VerificationReport | None
     fixed: bool
+    cost_usd: float = 0.0       # this attempt's LLM cost (from the coder's trace)
 
 
 @dataclass
@@ -47,6 +48,10 @@ class RepairResult:
             if attempt.re_test is not None:
                 return attempt.re_test
         return None
+
+    @property
+    def total_cost_usd(self) -> float:
+        return sum(a.cost_usd for a in self.attempts)
 
 
 class SelfRepairEngine:
@@ -96,11 +101,12 @@ class SelfRepairEngine:
                     self._after_build(runtime)
                 run = await runtime.run(prompt)
                 outcome_text = (run.text or "").strip()
+                cost_usd = run.trace.metrics().get("cost_usd", 0.0)
                 await runtime.close()
                 re_test = self._targeted_retest(failure)
                 attempt = RepairAttempt(
                     attempt=attempt_no, prompt=prompt, outcome_text=outcome_text,
-                    re_test=re_test, fixed=re_test.passed,
+                    re_test=re_test, fixed=re_test.passed, cost_usd=cost_usd,
                 )
                 result.attempts.append(attempt)
                 if attempt.fixed:
