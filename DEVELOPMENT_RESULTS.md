@@ -1079,7 +1079,29 @@ Repair attempts: 5
 
 ### 9. Git 信息
 
-（提交后填写）
+```
+Branch:
+feat/phase-05-multi-agent
+
+Commits:
+567b5a6 refactor(runtime): allow custom ACLs and read-safe tool extensions
+4db425d feat(agents): add agent artifact mailbox for structured inter-agent exchange
+d4f43c6 feat(agents): add repository and publish tools for role agents
+a08a589 feat(agents): add the five role definitions with prompts and tool ACLs
+fd191e6 feat(agents): add TeamRunner single-pass pipeline
+3d691f7 test(agents): add 32 multi-agent tests
+0faaa42 docs(phase-05): record multi-agent results and real-LLM acceptance
+01cee79 feat(phase-05): merge multi-agent team into repopilot-dev
+
+Remote:
+origin/feat/phase-05-multi-agent
+
+Push Status:
+PASS（phase 分支与 repopilot-dev 均已推送 origin）
+
+Integration:
+已合并入 repopilot-dev（merge commit 01cee79），合并后回归 312/312 PASS
+```
 
 ### 10. 当前模块最终实现能力
 
