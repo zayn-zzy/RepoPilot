@@ -714,7 +714,29 @@ Repair attempts: 5
 
 ### 9. Git 信息
 
-（提交后填写）
+```
+Branch:
+feat/phase-03-hybrid-retrieval
+
+Commits:
+021a87e feat(retrieval): add query analyzer and BM25 lexical retriever
+e446197 feat(retrieval): add LSA semantic and structural graph retrievers
+7241a70 feat(retrieval): add fusion, reranker, context builder and hybrid pipeline
+4b3817c chore(python): declare scikit-learn dependency for semantic retrieval
+fd3df49 test(retrieval): add 65 hybrid retrieval unit tests
+d82c85a test(benchmark): add retrieval benchmark with labeled queries and raw results
+4279f4c docs(phase-03): record hybrid retrieval results and benchmark numbers
+79cfdf8 feat(phase-03): merge hybrid retrieval and context into repopilot-dev
+
+Remote:
+origin/feat/phase-03-hybrid-retrieval
+
+Push Status:
+PASS（phase 分支与 repopilot-dev 均已推送 origin）
+
+Integration:
+已合并入 repopilot-dev（merge commit 79cfdf8），合并后回归 207/207 PASS
+```
 
 ### 10. 当前模块最终实现能力
 
