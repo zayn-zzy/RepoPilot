@@ -900,7 +900,7 @@ ab286d4 feat(planning): add requirement schema and parser
 c3fba9a feat(planning): add task node with a strict state machine
 622c67b feat(planning): add task DAG, validator and execution scheduler
 38ffb6a feat(planning): add deterministic and LLM planners
-f8c4d3a test(planning): add 73 planning unit tests
+a1852b0 test(planning): add 73 planning unit tests
 f48fd07 docs(phase-04): record requirement understanding and task DAG results
 4c0611a feat(phase-04): merge requirement understanding and task DAG into repopilot-dev
 
