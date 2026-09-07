@@ -111,5 +111,80 @@ class TestWorktreeCreation(unittest.TestCase):
         self.assertTrue(status.head_commit)
 
 
+class TestParallelIsolation(unittest.TestCase):
+    """The doc's core scenario: two no-dependency coding tasks run at the
+    same time, in separate worktrees, touching different files — neither
+    pollutes the other's filesystem state, and each has an independent
+    git diff."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.repo = _make_repo(Path(self._tmp.name))
+        self.mgr = WorktreeManager(self.repo)
+        self.wt1 = self.mgr.create("T001")
+        self.wt2 = self.mgr.create("T002")
+
+    def test_two_parallel_tasks_do_not_pollute_each_other(self):
+        (self.wt1.path / "a.py").write_text("def a():\n    return 100  # task one\n")
+        (self.wt2.path / "b.py").write_text("def b():\n    return 200  # task two\n")
+        (self.wt1.path / "new_one.txt").write_text("only task one\n")
+
+        # Filesystem isolation: task one's edits are invisible everywhere else.
+        self.assertEqual((self.repo / "a.py").read_text(), "def a():\n    return 1\n")
+        self.assertEqual((self.repo / "b.py").read_text(), "def b():\n    return 2\n")
+        self.assertEqual((self.wt2.path / "a.py").read_text(), "def a():\n    return 1\n")
+        self.assertFalse((self.repo / "new_one.txt").exists())
+        self.assertFalse((self.wt2.path / "new_one.txt").exists())
+
+        # Independent git diffs: each diff contains only its own files.
+        d1 = self.mgr.diff("T001")
+        d2 = self.mgr.diff("T002")
+        self.assertEqual(d1.files, ["a.py"])
+        self.assertEqual(d1.untracked, ["new_one.txt"])
+        self.assertEqual(d2.files, ["b.py"])
+        self.assertEqual(d2.untracked, [])
+        self.assertIn("return 100  # task one", d1.patch)
+        self.assertNotIn("task two", d1.patch)
+        self.assertIn("return 200  # task two", d2.patch)
+        self.assertNotIn("task one", d2.patch)
+
+        # The main workspace stays clean throughout.
+        self.assertEqual(_git(self.repo, "status", "--porcelain"), "")
+        self.assertEqual(_git(self.wt1.path, "status", "--porcelain").count("\n") + 1, 2)
+        self.assertEqual(_git(self.wt2.path, "status", "--porcelain").count("\n") + 1, 1)
+
+    def test_commit_records_change_and_keeps_main_clean(self):
+        (self.wt1.path / "a.py").write_text("def a():\n    return 100\n")
+        hash1 = self.mgr.commit("T001", "feat: task one changes a.py")
+        self.assertEqual(hash1, _git(self.wt1.path, "rev-parse", "HEAD"))
+        self.assertNotEqual(hash1, self.wt1.base_commit)
+        # The main branch did not move.
+        self.assertEqual(_git(self.repo, "rev-parse", "HEAD"), self.wt1.base_commit)
+        # The committed change is part of the task diff.
+        d = self.mgr.diff("T001")
+        self.assertEqual(d.files, ["a.py"])
+        self.assertIn("return 100", d.patch)
+        self.assertEqual(self.mgr.status("T001").clean, True)
+        # Committing again with no changes is an error, not a silent no-op.
+        with self.assertRaises(NothingToCommitError):
+            self.mgr.commit("T001", "nothing new")
+
+    def test_untracked_files_visible_then_included_by_commit(self):
+        # New (untracked) files belong to the task: diff() reports them,
+        # commit() records them (git add -A), then they appear as tracked.
+        (self.wt2.path / "scratch.py").write_text("print('wip')\n")
+        self.assertEqual(self.mgr.diff("T002").untracked, ["scratch.py"])
+        hash1 = self.mgr.commit("T002", "feat: add scratch module")
+        self.assertNotEqual(hash1, self.wt2.base_commit)
+        d = self.mgr.diff("T002")
+        self.assertEqual(d.files, ["scratch.py"])
+        self.assertEqual(d.untracked, [])
+        self.assertIn("print('wip')", d.patch)
+        # Only the task branch moved; main is untouched and still clean.
+        self.assertEqual(_git(self.repo, "rev-parse", "HEAD"), self.wt2.base_commit)
+        self.assertEqual(_git(self.repo, "status", "--porcelain"), "")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

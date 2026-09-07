@@ -278,3 +278,44 @@ class WorktreeManager:
             clean=not changes,
             changes=changes,
         )
+
+    # ─── diff collection + commit ───────────────────────────────
+
+    def diff(self, task_id: str) -> TaskDiff:
+        """The task's independent diff: everything the worktree changed
+        since its base commit (committed and uncommitted, tracked and
+        untracked) — nothing from any other task or the main workspace."""
+        info = self.get(task_id)
+        if not info.path.exists():
+            raise WorktreeError(f"worktree for task {task_id!r} no longer exists at {info.path}")
+        base = info.base_commit
+        files = [f for f in
+                 self._git(["diff", "--name-only", base], info.path).splitlines() if f.strip()]
+        untracked = [f for f in self._git(
+            ["ls-files", "--others", "--exclude-standard"], info.path).splitlines() if f.strip()]
+        return TaskDiff(
+            task_id=task_id,
+            branch=info.branch,
+            base_commit=base,
+            head_commit=self._git(["rev-parse", "HEAD"], info.path),
+            files=files,
+            untracked=untracked,
+            patch=self._git(["diff", base], info.path),
+            stat=self._git(["diff", "--stat", base], info.path),
+        )
+
+    def commit(self, task_id: str, message: str) -> str:
+        """Commit the worktree's changes on the task branch; returns the
+        new commit hash. Raises NothingToCommitError when there is nothing
+        to record."""
+        info = self.get(task_id)
+        if not info.path.exists():
+            raise WorktreeError(f"worktree for task {task_id!r} no longer exists at {info.path}")
+        self._git(["add", "-A"], info.path)
+        p = self._run(["commit", "-m", message], info.path)
+        if p.returncode != 0:
+            if "nothing to commit" in (p.stdout + p.stderr):
+                raise NothingToCommitError(f"worktree for task {task_id!r} has nothing to commit")
+            raise WorktreeError(
+                f"commit failed in task {task_id!r}: {(p.stderr or p.stdout).strip()}")
+        return self._git(["rev-parse", "HEAD"], info.path)
