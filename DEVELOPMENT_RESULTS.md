@@ -1573,7 +1573,7 @@ Branch：`feat/phase-07-verification-repair`（自 repopilot-dev 70214b9
 | 3ca45ce | test(verify): collect isolation for the bug_repo fixture |
 | 74cd2b0 | feat(verify): record per-attempt LLM cost in the repair result |
 | （本文档） | docs(phase-07): record verification and self-repair results |
-| （待定） | feat(phase-07): merge verification-repair into repopilot-dev |
+| f1bd56f | feat(phase-07): merge verification-repair into repopilot-dev |
 
 Push：`origin/feat/phase-07-verification-repair` → 合并
 `repopilot-dev` → 集成回归（全量 356）→ Push `origin/repopilot-dev`。
