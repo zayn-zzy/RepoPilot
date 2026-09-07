@@ -1316,7 +1316,7 @@ Branch：`feat/phase-06-worktree`（自 repopilot-dev ebfa52c 分叉）
 | ad52ce4 | feat(worktree): cleanup with safe-delete guards |
 | 7fb8a80 | feat(agents): optional worktree binding for TeamRunner |
 | 57d4080 | docs(phase-06): record worktree isolation results |（本文档） |
-| （待定） | feat(phase-06): merge worktree isolation into repopilot-dev |
+| a5d1838 | feat(phase-06): merge worktree isolation into repopilot-dev |
 
 Push：`origin/feat/phase-06-worktree` → 合并 `repopilot-dev` → 集成回归
 （全量 334）→ Push `origin/repopilot-dev`。
