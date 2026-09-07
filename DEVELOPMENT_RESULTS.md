@@ -1790,7 +1790,7 @@ Branch：`feat/phase-08-sandbox-security`（自 repopilot-dev 40fa3ef
 | 781c61e | feat(sandbox): security policies — dangerous commands, secrets, path guard |
 | 3457ab8 | feat(sandbox): SandboxPolicy and DockerRunner |
 | （本文档） | docs(phase-08): record sandbox security results |
-| （待定） | feat(phase-08): merge sandbox-security into repopilot-dev |
+| b54ce47 | feat(phase-08): merge sandbox-security into repopilot-dev |
 
 Push：`origin/feat/phase-08-sandbox-security` → 合并 `repopilot-dev` →
 集成回归（全量 392）→ Push `origin/repopilot-dev`。
