@@ -891,7 +891,28 @@ Repair attempts: 5
 
 ### 9. Git 信息
 
-（提交后填写）
+```
+Branch:
+feat/phase-04-task-dag
+
+Commits:
+ab286d4 feat(planning): add requirement schema and parser
+c3fba9a feat(planning): add task node with a strict state machine
+622c67b feat(planning): add task DAG, validator and execution scheduler
+38ffb6a feat(planning): add deterministic and LLM planners
+f8c4d3a test(planning): add 73 planning unit tests
+f48fd07 docs(phase-04): record requirement understanding and task DAG results
+4c0611a feat(phase-04): merge requirement understanding and task DAG into repopilot-dev
+
+Remote:
+origin/feat/phase-04-task-dag
+
+Push Status:
+PASS（phase 分支与 repopilot-dev 均已推送 origin）
+
+Integration:
+已合并入 repopilot-dev（merge commit 4c0611a），合并后回归 280/280 PASS
+```
 
 ### 10. 当前模块最终实现能力
 
