@@ -270,5 +270,70 @@ class TestMergeAndConflicts(unittest.TestCase):
         self.assertEqual(self.mgr.detect_conflicts("T002", "main"), [])
 
 
+class TestCleanup(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.repo = _make_repo(Path(self._tmp.name))
+        self.mgr = WorktreeManager(self.repo)
+
+    def test_cleanup_removes_worktree_and_branch(self):
+        wt = self.mgr.create("T001")
+        (wt.path / "a.py").write_text("def a():\n    return 100\n")
+        self.mgr.commit("T001", "feat: task one")
+        self.mgr.merge("T001", "main")
+        self.mgr.cleanup("T001")
+        self.assertFalse(wt.path.exists())
+        self.assertEqual(_git(self.repo, "branch", "--list", "task/T001"), "")
+        self.assertEqual(self.mgr.list(), [])
+        self.assertEqual(_git(self.repo, "worktree", "list").count("worktrees/"), 0)
+        # The merged change survives cleanup (only the task branch moved on).
+        self.assertIn("return 100", (self.repo / "a.py").read_text())
+
+    def test_cleanup_refuses_dirty_worktree_without_force(self):
+        wt = self.mgr.create("T001")
+        (wt.path / "a.py").write_text("def a():\n    return 100\n")  # uncommitted
+        with self.assertRaises(WorktreeDirtyError):
+            self.mgr.cleanup("T001")
+        # Nothing was discarded: the worktree and its change are still there.
+        self.assertTrue(wt.path.exists())
+        self.assertIn("return 100", (wt.path / "a.py").read_text())
+        self.mgr.cleanup("T001", force=True)
+        self.assertFalse(wt.path.exists())
+        self.assertEqual(_git(self.repo, "branch", "--list", "task/T001"), "")
+
+    def test_cleanup_refuses_unmerged_branch_without_force(self):
+        wt = self.mgr.create("T001")
+        (wt.path / "a.py").write_text("def a():\n    return 100\n")
+        self.mgr.commit("T001", "feat: task one")  # never merged into main
+        with self.assertRaises(WorktreeError):
+            self.mgr.cleanup("T001")
+        # Atomic refusal: both the worktree and the branch remain intact.
+        self.assertTrue(wt.path.exists())
+        self.assertIn("task/T001", _git(self.repo, "branch", "--list"))
+        self.mgr.cleanup("T001", force=True)
+        self.assertFalse(wt.path.exists())
+        self.assertEqual(_git(self.repo, "branch", "--list", "task/T001"), "")
+
+    def test_cleanup_all_removes_every_registered_task(self):
+        self.mgr.create("T001")
+        self.mgr.create("T002")
+        removed = self.mgr.cleanup_all()
+        self.assertEqual(removed, ["T001", "T002"])
+        self.assertEqual(self.mgr.list(), [])
+        self.assertEqual(_git(self.repo, "branch", "--list", "task/*"), "")
+
+    def test_cleanup_survives_manually_deleted_worktree_dir(self):
+        wt = self.mgr.create("T001")
+        (wt.path / "a.py").write_text("def a():\n    return 100\n")
+        self.mgr.commit("T001", "feat: task one")
+        self.mgr.merge("T001", "main")
+        _git(self.repo, "worktree", "remove", "--force", str(wt.path))  # by hand
+        # Cleanup finishes the job: branch and metadata are still removed.
+        self.mgr.cleanup("T001")
+        self.assertEqual(_git(self.repo, "branch", "--list", "task/T001"), "")
+        self.assertEqual(self.mgr.list(), [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
