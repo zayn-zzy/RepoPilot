@@ -5,7 +5,7 @@
 
 ## Project Status
 
-Current Phase: Phase 6（Git Worktree Isolation）
+Current Phase: Phase 7（Verification + Self-Repair）
 Overall Status: IN_PROGRESS
 Integration Branch: repopilot-dev
 Last Updated: 2026-09-07
@@ -19,6 +19,7 @@ Last Updated: 2026-09-07
 | 4 | Requirement + Task DAG | feat/phase-04-task-dag | COMPLETED | 280/280 PASS | PASS |
 | 5 | Multi-Agent | feat/phase-05-multi-agent | COMPLETED | 312/312 PASS | PASS |
 | 6 | Git Worktree Isolation | feat/phase-06-worktree | COMPLETED | 334/334 PASS | PASS |
+| 7 | Verification + Self-Repair | feat/phase-07-verification-repair | COMPLETED | 356/356 PASS | PASS |
 
 ---
 
@@ -1354,3 +1355,261 @@ Push：`origin/feat/phase-06-worktree` → 合并 `repopilot-dev` → 集成回�
 - 待后续集成：TaskDAG Scheduler（Phase 4）驱动多任务并行 worktree
   （当前 TeamRunner 单团队单任务）；Phase 7 的 VerificationFailure 流
   需要把 tester 输出接回 worktree 修复循环。
+
+---
+
+## Phase 7：Verification + Self-Repair
+
+### 1. 开发目标
+
+建立 Verification Pipeline（Code Change → Syntax → Lint → Type →
+Targeted → Unit → Integration → Regression → Reviewer），实际命令**按
+仓库能力自动检测**（不假设所有项目都有 ruff/mypy/pytest，必须记录最
+终选择了哪些工具）；统一 VerificationFailure 模型（stage / command /
+exit_code / stdout / stderr / failed_tests / related_files）；实现
+Self-Repair 循环（Failure → Summarizer → Root Cause → Retrieve Related
+Code → Coder Repair → Targeted Re-test，max_repair_attempts = 3）；
+设计 sample_bug_repo（人为注入易修复错误）并**真实演示** FAIL →
+Diagnose → Repair → Re-test → PASS。
+
+### 2. 实现内容
+
+新增 `mini_claude/verify/` 包（4 个模块，约 640 行）：
+
+- **统一 Failure 模型**：VerificationFailure（文档要求的 7 字段 +
+  summary() 即 Failure Summarizer 输出）、StageResult（passed/failed/
+  skipped + 真实命令 + skip 原因）、VerificationReport（逐阶段结果 +
+  selected_tools 选择记录 + first_failure）。
+- **能力检测（真实探测）**：detect_tools() 逐个真实执行 --version 探
+  针：pytest → unittest（stdlib 兜底）；ruff → flake8 → pyflakes；
+  mypy → pyright。每次探测结果都记入 probe_log——**最终选择了哪些验证
+  工具是可查证的证据**。不可执行的二进制（PermissionError）按"不可
+  用"处理，探测永不崩溃。
+- **VerificationPipeline（fail-fast 八阶段）**：syntax（py_compile，
+  作用于变更文件）、lint / typecheck（检测到的工具，未检测到则跳过并
+  记录原因）、targeted_test（变更模块 → 测试文件映射：pkg/utils.py →
+  test_utils.py；自修复循环注入失败测试 id）、unit_test（排除
+  integration 目录）、integration_test、regression_test（全量）、
+  reviewer（钩子，未配置则记录跳过）。首个失败阶段即停止链条。
+  unittest 兜底路径用 per-directory discover（模块路径加载对无
+  `__init__.py` 的 tests 目录不可靠，discover 可靠）。失败解析复用
+  Phase 4 parse_test_failure 得到结构化 failed_tests。
+- **SelfRepairEngine**：每次尝试 = 新 coder AgentRuntime（Phase 5
+  coder 角色 + 角色 ACL 复用，独立上下文/预算/Trace），提示词 =
+  失败摘要 + 检索到的相关代码（失败测试文件 + 变更文件内容，有
+  RepositoryIndex 时附依赖提示）+ 前次尝试记录；引擎自己做 Targeted
+  Re-test（以失败测试为靶的管道重跑）——coder 永远不给自己打分。
+  max_repair_attempts = 3；重测转绿即提前终止。每次尝试记录真实 LLM
+  成本（RepairAttempt.cost_usd）。
+- **sample_bug_repo 夹具**：pkg/utils.py 注入 `multiply()` 返回 a+b
+  的易修复 bug；test_utils.py 断言 3×4==12（unittest.TestCase 风格，
+  pytest 与 unittest 均能收集）；tests/integration/ 独立集成测试。
+  验证过：夹具真实 FAIL（`FAILED tests/test_utils.py::TestUtils::
+  test_multiply - AssertionError: 7 != 12`）。
+
+### 3. 新增文件
+
+| 文件 | 作用 |
+|------|------|
+| `python/mini_claude/verify/__init__.py` | 包导出 |
+| `python/mini_claude/verify/failure.py` | VerificationFailure / StageResult / VerificationReport |
+| `python/mini_claude/verify/detection.py` | ToolDetection + detect_tools 真实探测 |
+| `python/mini_claude/verify/pipeline.py` | VerificationPipeline 八阶段 fail-fast |
+| `python/mini_claude/verify/repair.py` | SelfRepairEngine + RepairAttempt/RepairResult |
+| `python/tests/fixtures/bug_repo/` | sample_bug_repo（5 文件，含注入 bug） |
+| `python/tests/verify/test_failure.py` | 模型测试（7 例） |
+| `python/tests/verify/test_verification_pipeline.py` | 检测+管道测试（11 例） |
+| `python/tests/verify/test_repair.py` | 修复循环测试（5 例，脚本化 LLM） |
+| `python/tests/conftest.py` | collect_ignore fixtures（bug_repo 自带测试不可被主套件收集） |
+
+### 4. 修改文件
+
+| 文件 | 修改 | 接口影响 |
+|------|------|----------|
+| （无 Phase 1-6 模块修改） | verify 包纯新增，仅复用 parse_test_failure / coder 角色 | 零侵入 |
+
+### 5. 核心设计
+
+```
+                     VerificationPipeline (fail-fast)
+ Code Change ──► syntax ──► lint ──► typecheck ──► targeted ──► unit
+    (TaskDiff   py_compile   ruff/      mypy/        变更模块→      排除
+     文件列表)  [变更文件]   flake8/    pyright       测试文件映射    integration
+                             pyflakes  [skip if      [skip if      ──► integration
+                             [skip if   not found]    not found]    ──► regression
+                              not found]                             ──► reviewer
+                                          │ first failure (VerificationFailure)
+                                          ▼
+                         SelfRepairEngine  (max_repair_attempts = 3)
+   Failure Summarizer ──► Root Cause + Coder Repair ──► Targeted Re-test
+   (deterministic)          (新 coder AgentRuntime/尝试，       (以 failed_tests
+                             cwd 绑定 repair root，               为靶的管道重跑)
+                             检索相关代码注入提示词)                     │
+                                          └────── 绿？提前终止 ◄──────┘
+```
+
+- 每个跳过都是**记录在案的真实决策**：selected_tools 逐项写明
+  "ruff/flake8/pyflakes not detected" 等。
+- 自修复循环的 cwd 绑定：coder 的文件工具按 cwd 相对路径解析，引擎像
+  TeamRunner 一样把进程 cwd 切到 repair root 并恢复（测试中发现未绑
+  定时脚本化 coder 改掉了**夹具本身**——Phase 5 污染类 bug 复现，
+  见 Self-Repair 第 1 条）。
+
+### 6. 测试
+
+新增 23 例（tests/verify/，真实命令 + 真实 git/LLM 边界）：
+
+- **模型**：VerificationFailure 七字段、summary() 截断、StageResult.
+  failure 仅在 failed 时非空、Report.passed/first_failure。
+- **检测**：真实探测（本环境 pytest 9.1.1 检出、ruff/mypy 记录 not
+  detected）；注入探针的确定性用例（选 ruff/unittest、全缺）。
+- **管道**：真实 pytest 在夹具副本上 FAIL（targeted_test 首败、
+  failed_tests 解析正确、链条停在失败处）；syntax 阶段捕获语法错误
+  （exit 1）；绿路径八阶段顺序 + unit 排除 integration + regression
+  全量；lint/typecheck 缺失时干净跳过；reviewer 钩子收尾；targeted
+  映射（源文件/测试文件/无关文件三种情形）；unittest 兜底真实命令。
+- **修复循环**：一次修复成功（真实 edit_file 改文件 + 全管道转绿）；
+  三次上限（无作为 coder → 3 次尝试、bug 原样）；第二次成功；
+  提示词含摘要+相关代码；前次尝试注入提示词。
+
+### 7. 验证结果
+
+单元测试（真实命令与真实数字）：
+
+```text
+$ /data/PR/venv/bin/python -m pytest python/tests/verify/ -q
+22 passed in 32.80s
+
+$ /data/PR/venv/bin/python -m pytest python/tests/ -q
+356 passed in 42.25s        ← 全量回归（334 旧 + 22 新，零回归）
+```
+
+**真实演示（文档必须项：FAIL → Diagnose → Repair → Re-test → PASS）**
+——tmp 副本 + 真实 LLM（deepseek-v4-pro[1m] 网关）+ 真实命令：
+
+```text
+STEP 1 — pipeline on the buggy copy:
+  selected tools: {'python': '/data/PR/venv/bin/python',
+    'syntax': 'python -m py_compile',
+    'lint': 'skipped: ruff/flake8/pyflakes not detected',
+    'typecheck': 'skipped: mypy/pyright not detected',
+    'test_runner': 'pytest', 'targeted_test': 'pytest <mapped test files>',
+    'reviewer': 'skipped: no reviewer configured'}
+  syntax passed | lint skipped | typecheck skipped
+  targeted_test FAILED  python -m pytest -q tests/test_utils.py
+  first failure stage: targeted_test | exit code: 1
+  failed tests: ['tests/test_utils.py::TestUtils::test_multiply']
+
+STEP 2 — self-repair (real LLM), attempt 1:
+  🔧 edit_file pkg/utils.py
+    → Error: You must read this file before editing.   ← read-before-edit
+  📖 read_file pkg/utils.py                            ← 守卫生效，模型自纠
+  🔧 edit_file pkg/utils.py → Successfully edited:
+    - def multiply(a, b):
+    -     # INJECTED BUG: ...
+    -     return a + b
+    + def multiply(a, b):
+    +     return a * b
+  attempt 1: fixed=True cost=$0.0140
+  targeted re-test: passed
+  repair fixed: True | attempts used: 1 | total repair cost: $0.0140
+
+STEP 3 — full pipeline on the repaired copy:
+  syntax passed | lint skipped | typecheck skipped
+  targeted_test passed | unit_test passed
+  integration_test passed | regression_test passed | reviewer skipped
+  final report passed: True
+
+STEP 4 — the actual diff the coder produced:
+  def add(a, b):
+      return a + b          ← add() 原样保留
+  def multiply(a, b):
+      return a * b          ← bug 修复，无越界改动
+
+DEMO RESULT: FAIL → Diagnose → Repair → Re-test → PASS  ✓
+```
+
+完整过程日志留存于 /tmp/phase7_demo.log（79 行）。演示中真实发生：
+模型先试图直接 edit_file 被 read-before-edit 守卫拒绝，随后自行先读
+后改；修复后 add() 原样保留（无越界改动）；成本 $0.0140（1 次尝试，
+真实 Trace 采集）。
+
+### 8. Self-Repair
+
+1. **修复循环污染夹具**：引擎未绑定 cwd 时，脚本化 coder 的
+   `edit_file "pkg/utils.py"` 按进程 cwd（恰为夹具目录）解析，**把夹
+   具自身的 bug 修掉了**。修复：engine.repair() 全程 os.chdir(root)
+   + finally 恢复（与 TeamRunner 同纪律）；恢复夹具并重跑验证。
+2. **pytest 断言重写缓存污染路径**：在夹具目录手工跑过一次 pytest 后
+   生成的 `__pycache__`（重写后 pyc 的 co_filename 烙死夹具路径）被
+   copytree 带入 tmp，mtime/size 一致 → pytest 复用旧 pyc → 测试
+   traceback 显示夹具路径。修复：清理夹具缓存目录 + 测试复制时
+   ignore `__pycache__`/`.pytest_cache`。
+3. **unittest 兜底 "Ran 0 tests"**：夹具最初是 pytest 函数式测试，
+   unittest discover 不收集函数（只收集 TestCase 类）。修复：夹具改
+   为 unittest.TestCase 风格（pytest 同样收集），并验证两条路径。
+4. **主套件收集夹具**：pytest 收集 bug_repo/tests/*.py → 
+   ModuleNotFoundError。修复：tests/conftest.py `collect_ignore =
+   ["fixtures"]`。
+5. **测试模块名冲突**：tests/retrieval/test_pipeline.py 与 verify 同名
+   （无包结构下均为顶层模块名 test_pipeline）→ import file mismatch。
+   修复：改名 test_verification_pipeline.py。
+6. **PATH 上不可执行二进制**：`ruff` 存在但无执行权限 → 探测抛
+   PermissionError。修复：探测/命令统一捕获 OSError 并记录为不可用/
+   失败，永不崩溃。
+7. **失败对象缺变更文件**：test 阶段 related_files 只含测试文件，
+   修复循环检索不到变更源文件（提示词里没有 pkg/utils.py）。修复：
+   related_files = 变更文件 + 测试文件。
+
+### 9. Git 信息
+
+Branch：`feat/phase-07-verification-repair`（自 repopilot-dev 70214b9
+分叉）
+
+| Commit | 内容 |
+|--------|------|
+| 9d13a1f | feat(verify): failure model, capability detection and verification pipeline |
+| 20b4523 | feat(verify): SelfRepairEngine with bounded repair loop |
+| 3ca45ce | test(verify): collect isolation for the bug_repo fixture |
+| 74cd2b0 | feat(verify): record per-attempt LLM cost in the repair result |
+| （本文档） | docs(phase-07): record verification and self-repair results |
+| （待定） | feat(phase-07): merge verification-repair into repopilot-dev |
+
+Push：`origin/feat/phase-07-verification-repair` → 合并
+`repopilot-dev` → 集成回归（全量 356）→ Push `origin/repopilot-dev`。
+
+### 10. 当前模块最终实现能力
+
+1. 八阶段 fail-fast 验证管道，全部命令按仓库能力真实探测并记录选择
+   与跳过原因；
+2. 统一 VerificationFailure（7 字段）+ Report + selected_tools 证据链；
+3. 自修复循环 max 3 次，失败摘要/相关代码检索/coder 修复/靶向复测
+   各司其职，coder 不给自己打分，成本可度量；
+4. 真实演示一次修复成功（$0.0140），完整过程留档；
+5. 与 Phase 6 无缝衔接：VerificationPipeline(root=worktree.path) 即可
+   验证任务 worktree 内的 Code Change（changed_files=TaskDiff）。
+
+### 11. 已知问题
+
+- targeted 映射是命名启发式（test_<module>.py / <module>_test.py）：
+  无对应测试文件时该阶段跳过并记录，不会伪造"已测"。
+- lint/typecheck 在本环境被如实跳过（未安装工具）；文档要求的
+  "记录最终选择了哪些验证工具"由 selected_tools + probe_log 满足。
+- 修复循环的 diagnosis 依赖 coder 模型质量：三次上限内未修复则如实
+  返回 fixed=False（有测试证明不会伪造成功）。
+- reviewer 阶段目前是钩子占位；Phase 5 的 reviewer 角色接入管道末
+  端是后续集成点。
+- 管道按顺序 fail-fast，不做并行阶段；大仓库全量回归耗时未做优化。
+
+### 12. 下一阶段依赖
+
+- Phase 8（Docker Sandbox + Security）直接复用：管道与修复循环中的
+  所有 shell 命令（run_tests/run_lint/py_compile/pytest）都要改为
+  Docker Runner 内执行；SelfRepairEngine 的 coder 写文件路径需要
+  sandbox 的 Path Traversal / Repository Root 约束。
+- 已稳定接口：`VerificationPipeline(root, changed_files, target_tests,
+  reviewer).run() -> VerificationReport`、`VerificationFailure.summary()`
+  、`SelfRepairEngine(root, pipeline, index, ...).repair(failure) ->
+  RepairResult`。
+- 待后续集成：TaskDAG Scheduler 用 VerificationFailure 驱动任务级
+  重试/重规划（Phase 4 的 retry/replan 目前用简化失败信号）。
