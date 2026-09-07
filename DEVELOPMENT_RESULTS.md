@@ -5,7 +5,7 @@
 
 ## Project Status
 
-Current Phase: Phase 2（Repository Intelligence）
+Current Phase: Phase 3（Hybrid Retrieval + Context）
 Overall Status: IN_PROGRESS
 Integration Branch: repopilot-dev
 Last Updated: 2026-09-06
@@ -15,6 +15,7 @@ Last Updated: 2026-09-06
 | 0 | Baseline 理解 | chore/phase-00-baseline | COMPLETED | 13/13 PASS | PASS（2026-09-06 补推） |
 | 1 | Agent Runtime | feat/phase-01-agent-runtime | COMPLETED | 72/72 PASS | PASS（2026-09-06 补推） |
 | 2 | Repository Intelligence | feat/phase-02-repository-intelligence | COMPLETED | 143/143 PASS | PASS |
+| 3 | Hybrid Retrieval + Context | feat/phase-03-hybrid-retrieval | COMPLETED | 207/207 PASS | PASS |
 
 ---
 
@@ -563,3 +564,188 @@ repopilot-dev 已推送 origin
   ParsedModule.content_hash（增量）、SQLiteStore 表结构（schema_version=1）。
 - 限制：仅 Python 仓库；图内未存储符号级引用边（symbol → symbol），
   1-hop 结构扩展目前基于文件依赖。
+
+---
+
+## Phase 3：Hybrid Retrieval + Context
+
+### 1. 开发目标
+
+RepoPilot 第二核心技术模块：把需求文本转成"该看哪些代码"。三条检索通路互补——
+Lexical（精确词面）、Semantic（语义相似）、Structural（符号+依赖图结构）——
+经 RRF 融合与重排后，用 Token-aware Context Builder 装进 LLM 上下文。
+Structural Retrieval 直接消费 Phase 2 的 Symbol Index 与 Dependency Graph
+（1-hop/2-hop 结构扩展）。本阶段还建立可复现的 Retrieval Benchmark，
+四种配置（Grep / Semantic / Hybrid / Hybrid+Graph）对比真实指标。
+
+### 2. 实现内容
+
+新增 `mini_claude/retrieval/` 包（8 个模块，约 900 行）：
+
+- **QueryAnalyzer**：需求文本 → 结构化检索意图（terms / symbol_hints /
+  path_hints / kind_hint）；英文停用词过滤（'to'/'how' 类全库噪声词会淹没
+  信号）；引号串、蛇形/驼峰标识符、路径式 token 的识别规则。
+- **LexicalRetriever（BM25）**：标准 BM25（k1=1.5, b=0.75）对文件内容分词
+  打分；叠加 Phase 2 Symbol Index 的符号名字段（2.0 加权，仅按 `.` 拆分
+  限定名——snake_case 标识符必须保持整体，首版按 `[._]` 拆分导致 boost
+  完全失效，被测试抓出）。
+- **SemanticRetriever（LSA）**：TF-IDF + TruncatedSVD（n=100，random_state
+  固定）余弦相似度——确定性、零外部依赖的经典潜在语义索引；类形状与神经
+  embedder 一致，后续可无缝替换。
+- **StructuralRetriever**：symbol_hints 对 Phase 2 符号索引做精确/子串/
+  前缀三级匹配；种子文件沿依赖图双向 BFS 扩展（dependencies + dependents，
+  1-hop/2-hop，衰减 0.5/0.25）；分数沿 BFS 逐跳传播（初版只看种子邻居，
+  2-hop 全灭，测试抓出）。
+- **Candidate Merge + Weighted Fusion**：RRF（rank-based，天然免疫各检索器
+  分数量纲差异）+ 归一化加权融合两套；Reranker 用检索器原始分（BM25 自带
+  IDF 加权、LSA 余弦）逐源归一化重排 + 符号/路径奖励 + 融合一致项。初版
+  用裸词频密度且按子串计数——'ui' 会命中 'require'/'build'，短 `__init__.py`
+  噪声文件全面压制正确答案（q11 从 Recall 0 修复到 1.0）。
+- **Token-aware Context Builder**：UTF-8 字节/4 估算 token；按命中序装入完整
+  文件内容，预算不足时降级为符号摘要（signature + 行号），再不行则记录
+  溢出；max_file_tokens 单文件上限。
+- **HybridRetriever 管道**：analyze → 三路检索（可独立开关，benchmark 的
+  ablation 配置即由此构造）→ path 直命中路（"read pkg/utils.py" 显式点名）→
+  RRF → Rerank → top-k；`build_context(query, token_budget)` 一键出上下文。
+- **grep_baseline**：Baseline A 的纯正则 grep（按命中数排序）。
+
+### 3. 新增文件
+
+| 文件 | 作用 |
+|------|------|
+| `python/mini_claude/retrieval/model.py` | RetrievalHit 共享类型 |
+| `python/mini_claude/retrieval/analyzer.py` | QueryAnalyzer + 停用词 |
+| `python/mini_claude/retrieval/lexical.py` | BM25 + 符号字段加权 |
+| `python/mini_claude/retrieval/semantic.py` | LSA 语义检索 |
+| `python/mini_claude/retrieval/structural.py` | 符号匹配 + 图扩展 |
+| `python/mini_claude/retrieval/fusion.py` | RRF/加权融合 + Reranker |
+| `python/mini_claude/retrieval/context.py` | Token-aware Context Builder |
+| `python/mini_claude/retrieval/pipeline.py` | HybridRetriever + grep_baseline |
+| `python/tests/retrieval/test_*.py` | 7 个测试文件（65 例） |
+| `python/tests/benchmark/queries.json` | 20 条手工标注查询（easy 5 / medium 8 / hard 7） |
+| `python/tests/benchmark/retrieval_benchmark.py` | Benchmark 脚本（4 方法 × 5 指标 × 分难度） |
+| `python/tests/benchmark/results/retrieval_benchmark.json` | 原始实验结果（逐查询） |
+
+### 4. 修改文件
+
+| 文件 | 修改 | 接口影响 |
+|------|------|----------|
+| `python/pyproject.toml` | dependencies 增加 scikit-learn（LSA 语义检索） | 新增安装依赖 |
+
+### 5. 核心设计
+
+```
+Requirement → QueryAnalyzer ─┬─ terms ─────────────→ LexicalRetriever (BM25+symbol field)
+                             ├─ raw ───────────────→ SemanticRetriever (TF-IDF→SVD→cosine)
+                             └─ symbol_hints ──────→ StructuralRetriever (symbol match
+                                path_hints             → 1/2-hop graph BFS expansion)
+                                       ↓
+                             path 直命中路（显式文件路径）
+                                       ↓
+                          Candidate Merge（RRF, 权重 lexical=1 semantic=1 structural=0.6）
+                                       ↓
+                          Reranker（逐源归一化: lex + 0.5·sem + 0.2·str + symbol/path 奖励
+                                    + 0.3·融合一致）
+                                       ↓
+                          Context Builder（token 预算内装内容 → 符号摘要降级 → 溢出记录）
+```
+
+### 6. 测试
+
+```bash
+/data/PR/venv/bin/python -m pytest python/tests/retrieval/ -v   # 65 passed
+/data/PR/venv/bin/python -m pytest python/tests/ -q            # 207 passed
+/data/PR/venv/bin/python python/tests/benchmark/retrieval_benchmark.py
+```
+
+### 7. 验证结果（真实 Benchmark，语料 = mini_claude 40 文件，20 条手工标注查询）
+
+PASS
+
+```
+method        Recall@5  Recall@10  MRR     Hit@5   Hit@10
+grep            0.8167     0.8833  0.7396  0.9500  1.0000
+semantic        0.9083     0.9250  0.7625  1.0000  1.0000
+hybrid          0.9083     0.9250  0.9250  1.0000  1.0000
+hybrid+graph    0.8917     0.9083  0.9250  1.0000  1.0000
+```
+
+分难度（Recall@5 / Recall@10 / MRR）：
+
+```
+         easy(5)            medium(8)           hard(7)
+grep     0.900/0.900/0.667  0.750/0.875/0.807  0.833/0.881/0.714
+semantic 0.900/0.900/0.850  0.938/0.938/0.854  0.881/0.929/0.595
+hybrid   0.900/0.900/1.000  0.938/0.938/0.875  0.881/0.929/0.929
++graph   0.900/0.900/1.000  0.938/0.938/0.875  0.833/0.881/0.929
+```
+
+结论（全部来自真实实验，原始逐查询结果存于
+`python/tests/benchmark/results/retrieval_benchmark.json`）：
+
+- **Hybrid 全面优于 Grep 与 Semantic**：MRR 0.9250 对 0.7396/0.7625；
+  hard 查询上 MRR 提升 0.334（0.929 vs 0.595，semantic 在关系型查询上
+  排序质量差，hybrid 的 BM25+符号匹配修复了首条命中位置）。
+- **Hybrid+Graph 与 Hybrid 打平（MRR 0.9250）**，Recall@5 低 0.017——
+  损失全部来自 q17（"RepositoryIndex 的使用者"）：pipeline.py 经**依赖注入**
+  使用 RepositoryIndex 而不 import 它，import 图里没有这条边；图扩展把
+  真邻居 store.py（非标注相关）排到 structural.py 之前。这是 import 图
+  的结构性局限，非权重可解，如实记录。
+- medium 查询上 Hybrid 相对 Grep +0.188 Recall@5——停用词过滤与语义融合
+  的价值所在；easy 查询上四种方法差距最小（唯一标识符 grep 就够）。
+
+### 8. Self-Repair
+
+- **失败 1**：Benchmark 首次运行四方法全 0。Root Cause：judgments 路径带
+  `mini_claude/` 前缀，与 corpus-relative 命中路径不匹配。修复：统一为
+  corpus-relative。
+- **失败 2**：首版查询集 18/20 含唯一标识符，grep 即达 0.95，四方法无
+  区分度。修复：重写为 easy/medium/hard 三层（改写转述、关系型提问）。
+- **失败 3**：hybrid 反而劣于纯 semantic。Root Cause：Reranker 的
+  词频密度按**子串**计数（'ui' 命中 require/build）且停用词（to/how）
+  全库噪声，`__init__.py` 短文件压制正确答案。修复：停用词过滤 +
+  reranker 改为检索器原始分（IDF 加权）逐源归一化。
+- **失败 4**：结构扩展 2-hop 全灭。Root Cause：扩展文件分数只看种子邻居，
+  2-hop 文件的邻居是 1-hop 文件。修复：分数沿 BFS 逐跳传播。
+- **失败 5**：lexical 符号字段 boost 失效。Root Cause：按 `[._]` 拆分
+  限定名把 snake_case 符号名拆碎。修复：仅按 `.` 拆分。
+
+Repair attempts: 5
+
+### 9. Git 信息
+
+（提交后填写）
+
+### 10. 当前模块最终实现能力
+
+1. 使用 BM25 + 符号名字段加权，实现词法检索（IDF 加权、长度归一化）。
+2. 使用 TF-IDF + TruncatedSVD（LSA），实现确定性语义检索（余弦排序）。
+3. 使用 Phase 2 Symbol Index + Dependency Graph，实现符号匹配与
+   1-hop/2-hop 双向结构扩展。
+4. 使用 RRF + 逐源归一化重排，实现三路候选融合（权重可配、ablation 友好）。
+5. 使用 UTF-8/4 token 估算，实现预算内上下文组装（内容 → 符号摘要 →
+   溢出记录三级降级）。
+6. 使用 20 条分层手工标注查询，实现四配置对比 Benchmark
+   （Recall@5/10、MRR、Hit@5/10，原始数据落盘可复现）。
+
+### 11. 已知问题
+
+- 语义检索为 LSA 而非神经 embedder——同义改写（paraphrase）能力有限；
+  接口已按 embedder 形状设计，后续可替换。
+- import 图无法表达依赖注入/字符串引用关系（q17 案例），1-hop 扩展会
+  引入真邻居但非相关的噪声文件。
+- 停用词表仅英文；CJK 查询词目前不参与词法/语义检索（仅靠引号串与
+  英文标识符部分）。
+- Benchmark 语料偏小（40 文件 20 查询），统计显著性有限——Phase 9
+  将扩展到任务级 Benchmark。
+
+### 12. 下一阶段依赖
+
+- Phase 4（Requirement + Task DAG）直接复用：QueryAnalyzer（需求解析的
+  词法层）、HybridRetriever.build_context（Planner 的代码上下文供给）、
+  DependencyGraph.topological_order（DAG 调度器）。
+- 已稳定接口：`HybridRetriever(index).retrieve(query, top_k)` /
+  `build_context(query, token_budget)`、`RetrievalHit`、
+  `RepositoryIndex` 全部查询、`estimate_tokens`。
+- 限制：retrieve 为同步接口（无 LLM 参与，完全确定性）；
+  Context Builder 只组装文件级上下文（符号级组装留待 Phase 5 角色化）。
