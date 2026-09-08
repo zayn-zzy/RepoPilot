@@ -22,7 +22,7 @@ Runtime、仓库智能、混合检索、任务规划、多代理团队、Git Wor
 | Multi-Agent（Planner/Explorer/Coder/Tester/Reviewer + Artifact 邮箱） | ✅ | `mini_claude/agents/` |
 | Git Worktree Isolation（任务分支/独立工作目录/冲突零覆盖/安全清理） | ✅ | `mini_claude/worktree/` |
 | Verification + Self-Repair（八阶段 fail-fast 管道/能力探测/≤3 次修复） | ✅ | `mini_claude/verify/` |
-| Docker Sandbox 安全策略（危险命令/密钥过滤/路径守卫/Runner） | ✅ 策略层；Docker 实机路径在本开发环境未验证（无 docker），见 DEVELOPMENT_RESULTS.md Phase 8 | `mini_claude/sandbox/` |
+| Docker Sandbox 安全策略（危险命令/密钥过滤/路径守卫/Runner） | ✅ 已接入实际命令执行（shell/tests/lint/验证，三态 auto/on/off，如实降级）；Docker 实机路径在本开发环境未验证（无 docker），见 DEVELOPMENT_RESULTS.md Phase 8/12 | `mini_claude/sandbox/` |
 | Evaluation + Benchmark（24 任务套件/四基线/消融/原始数据落盘） | ✅ | `mini_claude/evaluation/`、`tests/benchmark/phase9/` |
 | Productization（CLI/GitHub Issue→PR 流/§24 RunLog 可观测性） | ✅ | `mini_claude/product/` |
 | FastAPI / Trace Viewer | ❌ 未实现（文档标注为可选项） | — |
@@ -48,6 +48,9 @@ repopilot ask "订单总价在哪里计算？"
 export ANTHROPIC_API_KEY=...   # 或 ANTHROPIC_AUTH_TOKEN
 repopilot run "修复 multiply() 把加法当乘法的 bug"          # 确定性规划器
 repopilot run --llm --jobs 2 "修复 multiply() 把加法当乘法的 bug"   # LLM 规划器 + 并行
+repopilot run --sandbox on ...    # 强制 docker 沙箱（无 docker 则前置失败）
+# --sandbox auto（默认）：docker 可用时命令在容器内跑，不可用时降级宿主机
+# 并在每条结果与 run 汇总中如实标注（0 docker / N host / 0 blocked）
 
 # 评测（真实检索基准，24 任务 × 5 检索栈，原始数据落盘）
 repopilot benchmark
@@ -56,8 +59,9 @@ repopilot benchmark
 `repopilot run` 会：解析需求 → 生成 TaskDAG（`--llm` 用 LLM 规划器，
 默认确定性规划器）→ 调度器按依赖关系动态派发任务 → 每个 READY 任务
 一个独立 git worktree + 一个角色 Agent（`--jobs` 个任务并行）→ 每个
-任务真实运行仓库测试套件验证 → 失败则自修复（≤3 次）→ 提交 → 按
-拓扑序合并进集成 worktree（冲突一律中止合并、绝不强写）→ 最终全量
+任务真实运行仓库测试套件验证（Agent shell、run_tests/run_lint 与验证
+管线全部经 `--sandbox` 三态沙箱执行）→ 失败则自修复（≤3 次）→ 提交 →
+按拓扑序合并进集成 worktree（冲突一律中止合并、绝不强写）→ 最终全量
 验证 → 生成六节 PR 描述（Summary/Changes/Reason/Tests/Risk/Files
 Changed）。GitHub PR 创建通过 `gh` CLI（未安装时给出可直接执行的命令）。
 主工作区全程不被切换或写入。
@@ -65,7 +69,7 @@ Changed）。GitHub PR 创建通过 `gh` CLI（未安装时给出可直接执行
 ## 测试
 
 ```bash
-python -m pytest python/tests/ -q      # 当前 459/459
+python -m pytest python/tests/ -q      # 当前 481/481
 ```
 
 覆盖：单元/集成/E2E（E2E = 脚本化 LLM 驱动真实 Agent 循环走完整
@@ -106,8 +110,10 @@ Requirement ─► Planner ─► TaskDAG ─► DagRunner ─► 每任务一�
 
 ## 诚实声明
 
-- 沙箱 Docker 实机执行在本开发环境未验证（无 docker daemon）；
-  argv 翻译与安全策略有单测证据。
+- 沙箱 Docker 实机执行在本开发环境未验证（无 docker daemon）；argv
+  翻译、三闸门（deny 列表/密钥过滤/路径限制）、三态降级与如实记录
+  均有注入 executor 的单测 + 真实 CLI 证据（Phase 12）。
+- 工具探测探针（--version）在宿主机执行；阶段命令才是沙箱化的执行体。
 - `repopilot run` 已接入 TaskDAG 调度器（Phase 11）；Phase 9 基准中
   Proposed 栈当时按 TeamRunner 组合执行，故 -TaskDAG 消融在**该基准
   数据内**仍记录为 equivalent-by-construction（数据按当时执行如实

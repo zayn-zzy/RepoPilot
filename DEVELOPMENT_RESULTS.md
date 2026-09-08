@@ -2375,3 +2375,87 @@ run T77001: SUCCESS (4 task(s): succeeded=4)
   TeamRunner 组合执行如实保存，不追溯改写；跨任务记忆仍未接入。
 - 代理循环的终端 UI 输出（🔍/✏️ 等）来自原始 agent loop，未在本 Phase
   清理。
+
+---
+
+## Phase 12：Docker Sandbox 接入实际命令执行
+
+用户评审差距 #2："sandbox/ 已有策略和 Runner，但测试、lint 和 Agent shell
+仍通过宿主机 subprocess 执行"。本 Phase 把沙箱接进真实执行路径。
+
+### 12.1 目标
+
+1. Agent shell（内建 run_shell）、run_tests/run_lint、验证管线（语法/lint/
+   类型/测试）全部经过沙箱层执行；
+2. docker 可用时命令在容器内跑（network=none、无密钥、非 root、CPU/内存/
+   pids 限制、工作区挂载）；不可用时**如实降级并在每条结果上标注**——沙箱
+   状态永不伪造；
+3. `--sandbox on` 在 docker 不可用时前置失败（绝不静默降级）。
+
+### 12.2 实现
+
+- 新增 `sandbox/command.py`（~230 行）：`SandboxedCommandRunner` 三态
+  （off/auto/on）+ 每线程绑定（`set_sandbox`/`get_sandbox`，与 Phase 11 的
+  工作根同构——每个 DAG 任务线程绑定自己 worktree 的沙箱）。`CommandResult`
+  永远携带 `sandbox="docker"|"host"|"blocked"` + 降级原因 + 共享计数。
+- `sandbox/runner.py`：`DockerRunner.run(command, workspace=, cwd=)` ——
+  workspace 覆盖挂载根、cwd 翻译为 `-w /workspace/<rel>`（越界被
+  PathTraversalGuard 拒绝）；`policy.workspace_writable` 控制挂载读写
+  （默认 ro，文档规格；RepoPilot 运行对可丢弃的 task worktree 用 rw，
+  测试缓存才能落盘）。`_build_argv` 保持旧签名兼容。
+- 接线：`tools.py::_run_shell`（内建 shell）、`agents/tools.py::_run_shell`
+  （run_tests/run_lint）、`VerificationPipeline._run_cmd`（每阶段
+  StageResult.sandbox 记录真实执行位置）、`SelfRepairEngine`、
+  `evaluation.grade`、`DagRunner`（每任务构建 runner；on 模式前置探测）、
+  `run_dag_requirement`、CLI `--sandbox {auto,on,off}`（默认 auto）。
+- 解码加固（真实 run 发现的 bug）：命令输出不保证是合法 UTF-8，host 与
+  docker 执行路径统一 `errors="replace"`（与文件工具同策略）；沙箱层异常
+  在工具边界兜底为工具错误，绝不击穿 agent 循环。
+
+### 12.3 测试（+22，481/481；docker 路径全部经注入 executor 验证）
+
+| 文件 | 数量 | 覆盖 |
+|------|------|------|
+| tests/sandbox/test_command.py | 16 | 三态行为、policy argv（含 rw/ro 挂载、-w 子目录翻译、cwd 越界拒绝）、default-deny 在 executor 之前拦截、探测只跑一次、argv 引号化、线程局部隔离、内建 run_shell/run_tests 路由 + 拦截 + 降级注记 |
+| tests/verify/test_pipeline_sandbox.py | 3 | 阶段命令经 docker argv 执行且 StageResult 记录 sandbox="docker"；host 降级逐阶段记录；on 无 docker 阶段如实 failed(blocked) |
+| tests/execution/test_dag_runner.py 新增 | 3 | DAG 任务全部验证命令走 docker argv（透传 executor + 记录）；--sandbox on 无 docker 建 worktree 前拒绝；auto 无 docker 全程 host 降级且 report 如实标注 |
+
+```
+$ venv/bin/python -m pytest python/tests/ -q
+481 passed in 188.96s        # 459 + 22
+```
+
+### 12.4 真实验收（真实 LLM + 本机无 docker 二进制）
+
+```
+$ repopilot run --sandbox on --task-id T88001 "fix multiply"
+run T88001: FAILED (0 task(s))
+  note: sandbox mode 'on' but docker is unavailable (docker binary not found)
+        — no task ran; use --sandbox auto to fall back to host execution...
+
+$ repopilot run --sandbox auto --task-id T88002 "fix multiply: it computes a+b instead of a*b"
+run T88002: FAILED  → 真实发现 bug：tester 任务崩溃
+  'utf-8' codec can't decode byte 0xa0 in position 49: invalid start byte
+  → 根因：命令输出非 UTF-8 字节 + 新沙箱分支位于 try 之外 → 解码异常击穿 agent 循环
+  → 修复：执行层 errors="replace" + 工具边界兜底（见 12.2）
+  sandbox: auto (host fallback — docker binary not found) — 0 docker / 16 host / 0 blocked
+
+$ repopilot run --sandbox auto --task-id T88003 "fix multiply: it computes a+b instead of a*b"
+run T88003: SUCCESS (2 task(s): succeeded=2)
+  - T-B-1 [coder]  succeeded commit=0c68675 tests 1/1 $0.0155
+  - T-B-2 [tester] succeeded commit=742f69a tests 4/4 $0.0361
+  final verification: PASS 4/4 tests
+  sandbox: auto (host fallback — docker binary not found) — 0 docker / 16 host / 0 blocked command(s)
+```
+
+### 12.5 已知边界（如实）
+
+- 本环境无 docker 二进制/daemon：**docker 实机路径仍为 UNVERIFIED**；argv
+  翻译、三闸门、降级与记录均有注入 executor 的单测 + 真实 CLI 证据。
+- 工具探测（detect_tools 的 --version 探针）仍在宿主机执行（只读探测）；
+  阶段命令才是被沙箱化的执行体。
+- docker 可用的环境里，auto 会在容器内跑测试——policy.image
+  （默认 python:3.12-slim）必须带有仓库工具链（pytest/unittest 等），
+  镜像可经 SandboxPolicy 配置。
+- 旧 `run_requirement`（TeamRunner 组合，Phase 10 遗留路径）未接沙箱；
+  CLI 的 run 已走 DagRunner 路径。
