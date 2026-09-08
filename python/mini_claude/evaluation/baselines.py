@@ -8,9 +8,10 @@
 Ablations (per the spec): Full, -Structural, -Semantic, -TaskDAG,
 -Reviewer, -SelfRepair, -RepositoryMemory. Two of them (-TaskDAG,
 -RepositoryMemory) are recorded as equivalent-to-Full by construction:
-the Proposed stack does not yet wire the TaskDAG scheduler or any
-cross-task repository memory (documented Phase 5/6 limitations), so
-removing them changes nothing — recorded honestly in the results.
+the Proposed stack as EXECUTED for this benchmark used the TeamRunner
+composition (the TaskDAG scheduler was wired into ``repopilot run`` only
+later, in Phase 11) and no cross-task repository memory exists, so
+removing either changes nothing — recorded honestly in the results.
 """
 
 from __future__ import annotations

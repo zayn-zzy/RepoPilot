@@ -10,6 +10,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from typing import Callable
 
@@ -206,13 +207,37 @@ def get_deferred_tool_names(all_tools: list[ToolDef] | None = None) -> list[str]
 
 # ─── Tool execution ─────────────────────────────────────────
 
+# Thread-local work root: the DAG executor (execution/runner.py) runs one
+# task agent per thread, each bound to its own git worktree. File and
+# shell tools resolve relative paths against the calling thread's root
+# instead of the process cwd — parallel task threads can therefore never
+# touch each other's checkout. None (the default everywhere else) keeps
+# the original process-cwd behavior.
+_WORK_ROOT = threading.local()
+
+
+def set_work_root(path: str | None) -> None:
+    """Bind this thread's built-in file/shell tools to a checkout root.
+    Relative tool paths resolve under it; absolute paths pass through.
+    Pass None to restore the cwd-relative behavior."""
+    _WORK_ROOT.path = path
+
+
+def _rooted(p: str) -> str:
+    """Resolve a tool path against the thread's work root (if any)."""
+    root = getattr(_WORK_ROOT, "path", None)
+    if not root:
+        return p
+    q = Path(p)
+    return str(q) if q.is_absolute() else str(Path(root) / q)
+
 
 def _read_file(inp: dict) -> str:
     try:
         # errors="replace": undecodable bytes become U+FFFD instead of
         # raising — same behavior as Node's readFileSync("utf-8") in the TS
         # version, so both implementations return content for mixed files.
-        content = Path(inp["file_path"]).read_text(encoding="utf-8", errors="replace")
+        content = Path(_rooted(inp["file_path"])).read_text(encoding="utf-8", errors="replace")
         lines = content.split("\n")
         numbered = "\n".join(f"{i+1:4d} | {line}" for i, line in enumerate(lines))
         return numbered
@@ -222,7 +247,7 @@ def _read_file(inp: dict) -> str:
 
 def _write_file(inp: dict) -> str:
     try:
-        path = Path(inp["file_path"])
+        path = Path(_rooted(inp["file_path"]))
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(inp["content"])
         _auto_update_memory_index(str(path))
@@ -297,7 +322,7 @@ def _generate_diff(old_content: str, old_string: str, new_string: str) -> str:
 
 def _edit_file(inp: dict) -> str:
     try:
-        path = Path(inp["file_path"])
+        path = Path(_rooted(inp["file_path"]))
         content = path.read_text()
 
         actual = _find_actual_string(content, inp["old_string"])
@@ -320,7 +345,7 @@ def _edit_file(inp: dict) -> str:
 
 def _list_files(inp: dict) -> str:
     try:
-        base = Path(inp.get("path") or ".")
+        base = Path(_rooted(inp.get("path") or "."))
         pattern = inp["pattern"]
         files = []
         extra = 0
@@ -351,7 +376,7 @@ def _list_files(inp: dict) -> str:
 
 def _grep_search(inp: dict) -> str:
     pattern = inp["pattern"]
-    path = inp.get("path") or "."
+    path = _rooted(inp.get("path") or ".")
     include = inp.get("include")
 
     # Try system grep first (Linux/macOS)
@@ -439,6 +464,7 @@ def _run_shell(inp: dict) -> str:
             capture_output=True,
             text=True,
             timeout=timeout_s,
+            cwd=getattr(_WORK_ROOT, "path", None),
         )
         output = result.stdout or ""
         if result.returncode != 0:
@@ -695,7 +721,7 @@ async def execute_tool(
     if name == "read_file":
         result = _read_file(inp)
         if read_file_state is not None and not result.startswith("Error"):
-            abs_path = str(Path(inp["file_path"]).resolve())
+            abs_path = str(Path(_rooted(inp["file_path"])).resolve())
             try:
                 read_file_state[abs_path] = os.path.getmtime(abs_path)
             except OSError:
@@ -706,7 +732,7 @@ async def execute_tool(
         return result
 
     if name in ("write_file", "edit_file") and read_file_state is not None:
-        abs_path = str(Path(inp["file_path"]).resolve())
+        abs_path = str(Path(_rooted(inp["file_path"])).resolve())
         if os.path.exists(abs_path):
             if abs_path not in read_file_state:
                 verb = "writing" if name == "write_file" else "editing"

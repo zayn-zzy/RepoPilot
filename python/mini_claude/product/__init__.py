@@ -12,12 +12,16 @@ from .github import (
     fetch_issue,
     issue_to_requirement,
 )  # noqa: F401
-from .orchestrator import RunReport, run_requirement  # noqa: F401
+from .orchestrator import (  # noqa: F401
+    RunReport,
+    run_dag_requirement,
+    run_requirement,
+)
 from .runlog import RunLogger, RunRecord, RunRecorder  # noqa: F401
 
 __all__ = [
     "RunRecord", "RunRecorder", "RunLogger",
     "issue_to_requirement", "build_pr_body", "PR_SECTIONS",
     "fetch_issue", "create_pull_request",
-    "run_requirement", "RunReport",
+    "run_requirement", "run_dag_requirement", "RunReport",
 ]

@@ -4,7 +4,7 @@
     repopilot index       build and persist the repository index
     repopilot ask         answer a question with retrieval + LLM context
     repopilot plan        parse a requirement and produce a plan
-    repopilot run         run a requirement end-to-end in a worktree
+    repopilot run         run a requirement through its task DAG in parallel worktrees
     repopilot graph       print the dependency graph
     repopilot benchmark   run the Phase 9 evaluation (retrieval by default)
 
@@ -87,14 +87,20 @@ def main(argv: list[str] | None = None) -> int:
     p_plan.add_argument("--model", default="deepseek-v4-pro[1m]",
                         help="model for the LLM planner")
 
-    p_run = sub.add_parser("run", help="run a requirement end-to-end in a worktree")
+    p_run = sub.add_parser(
+        "run", help="run a requirement through its task DAG in parallel worktrees")
     p_run.add_argument("requirement", help="natural-language requirement")
     p_run.add_argument("--dir", default=".", help="repository root")
+    p_run.add_argument("--llm", action="store_true",
+                       help="build the task DAG with the LLM planner "
+                            "(default: deterministic planner)")
+    p_run.add_argument("--jobs", type=int, default=2,
+                       help="max parallel task worktrees (default: 2; 1 = sequential)")
     p_run.add_argument("--task-id", default=None,
                        help="task id for the worktree/branch (default: auto)")
     p_run.add_argument("--model", default="deepseek-v4-pro[1m]")
     p_run.add_argument("--no-commit", action="store_true",
-                       help="do not commit the worktree changes")
+                       help="do not commit or merge the task changes")
 
     p_graph = sub.add_parser("graph", help="print the dependency graph")
     p_graph.add_argument("dir", nargs="?", default=".")
@@ -203,54 +209,38 @@ def _cmd_ask(args) -> int:
     return 0
 
 
-def _cmd_plan(args) -> int:
-    from ..planning import Planner, RequirementParser
-    requirement = RequirementParser().parse(args.requirement)
-    print(f"requirement: {requirement.title} (kind={requirement.kind.value})")
-    print(f"description: {requirement.description}")
-    if requirement.related_files:
-        print(f"related files: {requirement.related_files}")
-    if args.llm:
-        api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
-        if not api_key:
-            print("error: --llm needs ANTHROPIC_API_KEY", file=sys.stderr)
-            return 1
+def _make_llm_call(api_key: str, model: str):
+    """The Planner's LLMCall contract: async (system, user) -> text.
+    Uses the Anthropic SDK pointed at the DeepSeek-compatible endpoint
+    (thinking must be disabled on SDK 1.4), with the net.py
+    direct-connection fallback for broken proxies."""
+    import anthropic
+    from ..net import anthropic_create_sync_with_fallback  # noqa: PLC0415
+    base_url = _llm_base_url()
+    client = anthropic.Anthropic(
+        api_key=api_key, base_url=base_url, timeout=120)
+    direct_factory = lambda: anthropic.Anthropic(  # noqa: E731
+        api_key=api_key, base_url=base_url, timeout=120)
 
-        def make_llm_call(model: str):
-            """The Planner's LLMCall contract: (system, user) -> text.
-            Uses the Anthropic SDK pointed at the DeepSeek-compatible
-            endpoint (thinking must be disabled on SDK 1.4), with the
-            net.py direct-connection fallback for broken proxies."""
-            import anthropic
-            from ..net import anthropic_create_sync_with_fallback  # noqa: PLC0415
-            base_url = _llm_base_url()
-            client = anthropic.Anthropic(
-                api_key=api_key, base_url=base_url, timeout=120)
-            direct_factory = lambda: anthropic.Anthropic(  # noqa: E731
-                api_key=api_key, base_url=base_url, timeout=120)
-
-            async def llm_call(system: str, user: str) -> str:
-                import asyncio
-                response = await asyncio.to_thread(
-                    anthropic_create_sync_with_fallback,
-                    client, direct_factory,
-                    model=model,
-                    max_tokens=2000,
-                    thinking={"type": "disabled"},
-                    system=system,
-                    messages=[{"role": "user", "content": user}],
-                )
-                return "".join(b.text for b in response.content
-                               if getattr(b, "type", "") == "text")
-
-            return llm_call
-
+    async def llm_call(system: str, user: str) -> str:
         import asyncio
-        planner = Planner(llm_call=make_llm_call(args.model))
-        plan = asyncio.run(planner.plan_with_llm(requirement))
-    else:
-        planner = Planner()
-        plan = planner._deterministic_plan(requirement)
+        response = await asyncio.to_thread(
+            anthropic_create_sync_with_fallback,
+            client, direct_factory,
+            model=model,
+            max_tokens=2000,
+            thinking={"type": "disabled"},
+            system=system,
+            messages=[{"role": "user", "content": user}],
+        )
+        return "".join(b.text for b in response.content
+                       if getattr(b, "type", "") == "text")
+
+    return llm_call
+
+
+def _print_plan(plan) -> None:
+    """Print a TaskDAG: id, role, title, dependencies, task count."""
     print("--- plan ---")
     tasks = getattr(plan, "tasks", None)
     if isinstance(tasks, dict):  # TaskDAG: id -> TaskNode
@@ -265,11 +255,32 @@ def _cmd_plan(args) -> int:
         print(f"{len(tasks)} task(s)")
     else:
         print(json.dumps(plan, indent=2, ensure_ascii=False, default=str))
+
+
+def _cmd_plan(args) -> int:
+    from ..planning import Planner, RequirementParser
+    requirement = RequirementParser().parse(args.requirement)
+    print(f"requirement: {requirement.title} (kind={requirement.kind.value})")
+    print(f"description: {requirement.description}")
+    if requirement.related_files:
+        print(f"related files: {requirement.related_files}")
+    if args.llm:
+        api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
+        if not api_key:
+            print("error: --llm needs ANTHROPIC_API_KEY", file=sys.stderr)
+            return 1
+        import asyncio
+        planner = Planner(llm_call=_make_llm_call(api_key, args.model))
+        plan = asyncio.run(planner.plan_with_llm(requirement))
+    else:
+        plan = Planner()._deterministic_plan(requirement)
+    _print_plan(plan)
     return 0
 
 
 def _cmd_run(args) -> int:
-    from ..product.orchestrator import run_requirement
+    from ..planning import Planner, RequirementParser
+    from ..product.orchestrator import run_dag_requirement
     root = Path(args.dir).resolve()
     _require_git(root)
     api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
@@ -277,13 +288,21 @@ def _cmd_run(args) -> int:
         print("error: repopilot run needs ANTHROPIC_API_KEY "
               "(or ANTHROPIC_AUTH_TOKEN)", file=sys.stderr)
         return 1
-    task_id = args.task_id or f"T{int(time.time()) % 100000}"
+    requirement = RequirementParser().parse(args.requirement)
+    print(f"requirement: {requirement.title} (kind={requirement.kind.value})")
     import asyncio
-    report = asyncio.run(run_requirement(
-        root, args.requirement, task_id=task_id,
+    if args.llm:
+        planner = Planner(llm_call=_make_llm_call(api_key, args.model))
+        plan = asyncio.run(planner.plan_with_llm(requirement))
+    else:
+        plan = Planner()._deterministic_plan(requirement)
+    _print_plan(plan)
+    task_id = args.task_id or f"T{int(time.time()) % 100000}"
+    report = asyncio.run(run_dag_requirement(
+        root, requirement, plan=plan, task_id=task_id,
         model=args.model, api_key=api_key,
         anthropic_base_url=_llm_base_url(),
-        commit=not args.no_commit,
+        jobs=args.jobs, commit=not args.no_commit,
     ))
     print(report.summarize())
     if report.pr is not None:

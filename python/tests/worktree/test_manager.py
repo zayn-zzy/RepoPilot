@@ -270,6 +270,67 @@ class TestMergeAndConflicts(unittest.TestCase):
         self.assertEqual(self.mgr.detect_conflicts("T002", "main"), [])
 
 
+class TestMergeIntoCwd(unittest.TestCase):
+    """Phase 11: merge(task_id, target_branch, cwd=...) merges into a
+    dedicated checkout (the DAG executor's integration worktree) — the
+    main workspace is never switched, dirtied or written to."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.repo = _make_repo(Path(self._tmp.name))
+        self.mgr = WorktreeManager(self.repo)
+
+    def test_merge_into_other_worktree_branch(self):
+        integration = self.mgr.create("INT", require_clean=False)
+        task = self.mgr.create("T001", require_clean=False)
+        (task.path / "a.py").write_text("def a():\n    return 100\n")
+        self.mgr.commit("T001", "task T001 changes a.py")
+
+        result = self.mgr.merge("T001", integration.branch, cwd=integration.path)
+
+        self.assertTrue(result.merged)
+        self.assertEqual(result.target_branch, integration.branch)
+        # The integration worktree advanced; the task change is there.
+        self.assertIn("return 100", (integration.path / "a.py").read_text())
+        # The main workspace was never touched: same branch, same HEAD,
+        # original content, clean.
+        self.assertEqual(_git(self.repo, "branch", "--show-current"), "main")
+        self.assertIn("return 1", (self.repo / "a.py").read_text())
+        self.assertEqual(_git(self.repo, "status", "--porcelain"), "")
+
+    def test_merge_conflict_in_other_worktree_never_overwrites(self):
+        integration = self.mgr.create("INT", require_clean=False)
+        task = self.mgr.create("T001", require_clean=False)
+        (task.path / "a.py").write_text("def a():\n    return 100  # task\n")
+        self.mgr.commit("T001", "task T001 edits a.py")
+        # The integration branch edits the same line independently.
+        (integration.path / "a.py").write_text("def a():\n    return 200  # int\n")
+        _git(integration.path, "add", "a.py")
+        _git(integration.path, "commit", "-qm", "integration side edits a.py")
+        int_head = _git(integration.path, "rev-parse", "HEAD")
+
+        with self.assertRaises(WorktreeConflictError) as ctx:
+            self.mgr.merge("T001", integration.branch, cwd=integration.path)
+
+        self.assertEqual(ctx.exception.files, ["a.py"])
+        # Nothing was overwritten: integration worktree content intact,
+        # HEAD unmoved, clean after the abort.
+        self.assertEqual((integration.path / "a.py").read_text(),
+                         "def a():\n    return 200  # int\n")
+        self.assertEqual(_git(integration.path, "rev-parse", "HEAD"), int_head)
+        self.assertEqual(_git(integration.path, "status", "--porcelain"), "")
+
+    def test_merge_cwd_must_be_on_target_branch(self):
+        task = self.mgr.create("T001", require_clean=False)
+        (task.path / "a.py").write_text("def a():\n    return 100\n")
+        self.mgr.commit("T001", "task T001 changes a.py")
+        # The main workspace is on `main`, the task worktree on task/T001 —
+        # merging into `main` with cwd=task worktree must refuse.
+        with self.assertRaises(WorktreeError):
+            self.mgr.merge("T001", "main", cwd=task.path)
+
+
 class TestCleanup(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()

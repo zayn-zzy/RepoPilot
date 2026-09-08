@@ -353,36 +353,44 @@ class WorktreeManager:
             # and never touches task code.
             self._run(["worktree", "remove", "--force", str(scratch)], self.root)
 
-    def merge(self, task_id: str, target_branch: str) -> MergeResult:
-        """Merge the task branch into ``target_branch`` in the main
-        workspace (--no-ff, so the task stays a recognizable unit).
+    def merge(self, task_id: str, target_branch: str, *,
+              cwd: str | Path | None = None) -> MergeResult:
+        """Merge the task branch into ``target_branch`` (--no-ff, so the
+        task stays a recognizable unit).
+
+        ``cwd`` selects the checkout the merge happens in: by default the
+        main workspace (which must be checked out on ``target_branch``);
+        the DAG executor passes its dedicated integration worktree so the
+        user's main workspace is never switched or touched.
 
         Never force-overwrites: on conflict the merge is aborted and
-        WorktreeConflictError is raised, leaving the main workspace
-        byte-identical to its pre-merge state. Requires a clean main
-        workspace checked out on ``target_branch``."""
+        WorktreeConflictError is raised, leaving the merge checkout
+        byte-identical to its pre-merge state. Requires that checkout to
+        be clean and on ``target_branch``."""
         info = self.get(task_id)
-        self._assert_clean(self.root, "main workspace")
-        current = self._current_branch()
+        work = Path(cwd).resolve() if cwd is not None else self.root
+        self._assert_clean(work, "merge checkout")
+        current = self._run(["symbolic-ref", "--short", "HEAD"], work)
+        current = current.stdout.strip() if current.returncode == 0 else "HEAD"
         if current != target_branch:
             raise WorktreeError(
-                f"main workspace is on branch {current!r}, not {target_branch!r}; "
+                f"merge checkout is on branch {current!r}, not {target_branch!r}; "
                 "check out the target branch first")
-        p = self._run(["merge", "--no-ff", "--no-edit", info.branch], self.root)
+        p = self._run(["merge", "--no-ff", "--no-edit", info.branch], work)
         if p.returncode == 0:
             return MergeResult(
                 task_id=task_id, target_branch=target_branch, merged=True,
-                commit=self._git(["rev-parse", "HEAD"], self.root))
+                commit=self._git(["rev-parse", "HEAD"], work))
         files = [f for f in self._git(
-            ["diff", "--name-only", "--diff-filter=U"], self.root).splitlines() if f.strip()]
+            ["diff", "--name-only", "--diff-filter=U"], work).splitlines() if f.strip()]
         if not files:
             raise WorktreeError(
                 f"merge of {info.branch} into {target_branch} failed without conflicts: "
                 f"{(p.stderr or p.stdout).strip()}")
         # Abort restores the pre-merge index and working tree; the clean
         # assertion below guarantees nothing was left behind (禁止暴力覆盖).
-        self._git(["merge", "--abort"], self.root)
-        self._assert_clean(self.root, "main workspace")
+        self._git(["merge", "--abort"], work)
+        self._assert_clean(work, "merge checkout")
         raise WorktreeConflictError(
             files,
             f"merge of {info.branch} into {target_branch} conflicts in {len(files)} "
