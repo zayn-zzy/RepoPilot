@@ -94,6 +94,36 @@ class TestCli(unittest.TestCase):
         self.assertEqual(p.returncode, 1)
         self.assertIn("ANTHROPIC_API_KEY", p.stderr)
 
+    def test_plan_llm_without_key_fails_explicitly(self):
+        p = _run(self.repo, "plan", "--llm", "add a login feature")
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("ANTHROPIC_API_KEY", p.stderr)
+
+    def test_env_file_is_loaded_and_never_overrides_real_env(self):
+        (self.repo / ".env").write_text(
+            "# comment line\n"
+            "ANTHROPIC_API_KEY=sk-from-env-file\n"
+            "ANTHROPIC_BASE_URL=https://api.deepseek.com\n"
+            "PATH=/should/never/win\n")
+        p = _run(self.repo, "plan", "--llm", "x",
+                 env={"ANTHROPIC_BASE_URL": "https://api.deepseek.com"})
+        # The key came from .env (the subprocess env has no key), so the
+        # failure moves PAST the key check — and PATH was not overridden
+        # by the .env file (the command ran at all).
+        self.assertNotIn("needs ANTHROPIC_API_KEY", p.stderr)
+
+    def test_deepseek_bare_base_url_is_normalized(self):
+        from mini_claude.product.cli import _llm_base_url
+        import os
+        os.environ["ANTHROPIC_BASE_URL"] = "https://api.deepseek.com"
+        self.assertEqual(_llm_base_url(), "https://api.deepseek.com/anthropic")
+        os.environ["ANTHROPIC_BASE_URL"] = "https://api.deepseek.com/anthropic"
+        self.assertEqual(_llm_base_url(), "https://api.deepseek.com/anthropic")
+        os.environ["ANTHROPIC_BASE_URL"] = "https://other.example.com/v1"
+        self.assertEqual(_llm_base_url(), "https://other.example.com/v1")
+        os.environ.pop("ANTHROPIC_BASE_URL")
+        self.assertIsNone(_llm_base_url())
+
     def test_benchmark_runs_real_retrieval_and_saves_raw(self):
         p = _run(self.repo, "benchmark", "--out",
                  str(self.repo / ".repopilot" / "bench"))
