@@ -200,6 +200,72 @@ async def run_requirement(root: str | Path, requirement: str | Requirement, *,
     return report
 
 
+async def run_dag_requirement(root: str | Path, requirement: str | Requirement, *,
+                              plan: Any,                     # planning.TaskDAG
+                              task_id: str = "TASK",
+                              model: str = "mock-model",
+                              api_key: str | None = None,
+                              anthropic_base_url: str | None = None,
+                              permission_mode: str = "acceptEdits",
+                              task_max_cost_usd: float = 0.75,
+                              task_max_turns: int = 12,
+                              repair_max_cost_usd: float = 0.5,
+                              max_repair_attempts: int = 3,
+                              jobs: int = 1,
+                              after_build: Callable[[Any], None] | None = None,
+                              logger: RunLogger | None = None,
+                              base_branch: str | None = None,
+                              commit: bool = True,
+                              ) -> "DagRunReport":
+    """Phase 11 composition — run one requirement through its TaskDAG:
+
+        plan → DagRunner (parallel task worktrees, per-task agent +
+        verification + bounded repair, honest merges) → final verification
+        → diff → PR description.
+
+    The main workspace is never touched: every task works in its own
+    worktree and merges land in the dedicated integration worktree.
+    ``after_build`` receives every freshly built task runtime (tests
+    inject scripted LLM clients here)."""
+    from ..execution import DagRunner
+    root = Path(root).resolve()
+    if isinstance(requirement, str):
+        requirement = RequirementParser().parse(requirement)
+    logger = logger or RunLogger(root / ".repopilot" / "runs.jsonl")
+    _ensure_local_exclude(root, "/.repopilot/")
+
+    runner = DagRunner(
+        root, plan, task_id=task_id, model=model, api_key=api_key,
+        anthropic_base_url=anthropic_base_url,
+        permission_mode=permission_mode,
+        task_max_cost_usd=task_max_cost_usd, task_max_turns=task_max_turns,
+        repair_max_cost_usd=repair_max_cost_usd,
+        max_repair_attempts=max_repair_attempts, jobs=jobs,
+        base_branch=base_branch, commit=commit, after_build=after_build,
+        recorder_factory=lambda title, agent: RunRecorder(task=title,
+                                                          agent=agent),
+        logger=logger,
+    )
+    report = await runner.run(requirement)
+    if report.worktree is not None and report.diff is not None:
+        repair = {"attempts": sum((o.repair or {}).get("attempts", 0)
+                                  for o in report.outcomes),
+                  "success": all((o.repair or {}).get("success")
+                                 for o in report.outcomes
+                                 if (o.repair or {}).get("attempts"))}
+        report.pr = PrInfo(
+            title=f"repopilot: {requirement.title}",
+            body=build_pr_body(requirement=requirement, diff=report.diff,
+                               team_result=None,
+                               verification=report.final_verification,
+                               repair=repair,
+                               base_branch=base_branch or "main"),
+            head_branch=report.worktree.branch,
+            base_branch=base_branch or "main",
+        )
+    return report
+
+
 def _last_run(recorder: RunRecorder, team_result) -> Any:
     """The RunResult for a recorder's role (RunRecorder doesn't keep it —
     look it up from the team outcomes by role)."""
