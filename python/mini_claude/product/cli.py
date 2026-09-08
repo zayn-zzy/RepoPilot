@@ -28,7 +28,38 @@ if str(_PYTHON_DIR) not in sys.path:
 REPOPILOT_VERSION = "0.1.0"
 
 
+def _load_env_file(path: str | Path = ".env") -> None:
+    """Minimal .env loader (no external dependency): KEY=VALUE lines and
+    # comments. Existing environment variables are never overridden, and
+    nothing is printed — values stay out of logs."""
+    p = Path(path)
+    if not p.is_file():
+        return
+    for raw in p.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+def _llm_base_url() -> str | None:
+    """The Anthropic-compatible base URL. DeepSeek convenience: the bare
+    OpenAI-compatible root (https://api.deepseek.com) returns 404 on the
+    Anthropic protocol — normalize it to the /anthropic endpoint."""
+    url = os.environ.get("ANTHROPIC_BASE_URL") or ""
+    if url.rstrip("/") == "https://api.deepseek.com":
+        return "https://api.deepseek.com/anthropic"
+    return url or None
+
+
 def main(argv: list[str] | None = None) -> int:
+    _load_env_file()  # .env in the current directory (never overrides the real env)
     parser = argparse.ArgumentParser(
         prog="repopilot",
         description="RepoPilot — autonomous software engineering for "
@@ -53,6 +84,8 @@ def main(argv: list[str] | None = None) -> int:
     p_plan.add_argument("requirement", help="natural-language requirement")
     p_plan.add_argument("--llm", action="store_true",
                         help="use the LLM planner (default: deterministic)")
+    p_plan.add_argument("--model", default="deepseek-v4-pro[1m]",
+                        help="model for the LLM planner")
 
     p_run = sub.add_parser("run", help="run a requirement end-to-end in a worktree")
     p_run.add_argument("requirement", help="natural-language requirement")
@@ -157,6 +190,7 @@ def _cmd_ask(args) -> int:
     from ..runtime import AgentRuntime, AgentConfig, build_default_registry
     runtime = AgentRuntime(AgentConfig(
         role="general", model=args.model, api_key=api_key,
+        anthropic_base_url=_llm_base_url(),
         custom_system_prompt="You answer questions about a code repository "
                              "using the provided context.",
     ), registry=build_default_registry())
@@ -181,10 +215,36 @@ def _cmd_plan(args) -> int:
         if not api_key:
             print("error: --llm needs ANTHROPIC_API_KEY", file=sys.stderr)
             return 1
+
+        def make_llm_call(model: str):
+            """The Planner's LLMCall contract: (system, user) -> text.
+            Uses the Anthropic SDK pointed at the DeepSeek-compatible
+            endpoint (thinking must be disabled on SDK 1.4)."""
+            import anthropic
+            client = anthropic.Anthropic(
+                api_key=api_key,
+                base_url=_llm_base_url(),
+                timeout=120,
+            )
+
+            async def llm_call(system: str, user: str) -> str:
+                import asyncio
+                response = await asyncio.to_thread(
+                    client.messages.create,
+                    model=model,
+                    max_tokens=2000,
+                    thinking={"type": "disabled"},
+                    system=system,
+                    messages=[{"role": "user", "content": user}],
+                )
+                return "".join(b.text for b in response.content
+                               if getattr(b, "type", "") == "text")
+
+            return llm_call
+
         import asyncio
-        planner = Planner(api_key=api_key,
-                          base_url=os.environ.get("ANTHROPIC_BASE_URL"))
-        plan = asyncio.run(planner.plan(requirement))
+        planner = Planner(llm_call=make_llm_call(args.model))
+        plan = asyncio.run(planner.plan_with_llm(requirement))
     else:
         planner = Planner()
         plan = planner._deterministic_plan(requirement)
@@ -219,7 +279,7 @@ def _cmd_run(args) -> int:
     report = asyncio.run(run_requirement(
         root, args.requirement, task_id=task_id,
         model=args.model, api_key=api_key,
-        anthropic_base_url=os.environ.get("ANTHROPIC_BASE_URL"),
+        anthropic_base_url=_llm_base_url(),
         commit=not args.no_commit,
     ))
     print(report.summarize())
