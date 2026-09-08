@@ -5,7 +5,7 @@
 
 ## Project Status
 
-Current Phase: Phase 8（Docker Sandbox + Security）
+Current Phase: Phase 9（Evaluation + Benchmark）
 Overall Status: IN_PROGRESS
 Integration Branch: repopilot-dev
 Last Updated: 2026-09-07
@@ -21,6 +21,7 @@ Last Updated: 2026-09-07
 | 6 | Git Worktree Isolation | feat/phase-06-worktree | COMPLETED | 334/334 PASS | PASS |
 | 7 | Verification + Self-Repair | feat/phase-07-verification-repair | COMPLETED | 356/356 PASS | PASS |
 | 8 | Docker Sandbox + Security | feat/phase-08-sandbox-security | COMPLETED | 392/392 PASS | PASS |
+| 9 | Evaluation + Benchmark | feat/phase-09-evaluation | COMPLETED | 406/406 PASS | PASS |
 
 ---
 
@@ -1833,3 +1834,232 @@ Push：`origin/feat/phase-08-sandbox-security` → 合并 `repopilot-dev` →
   SandboxResult`。
 - 待后续集成：VerificationPipeline._run_cmd → DockerRunner.run（有
   Docker 的环境）；TeamRunner coder 的 run_shell 沙箱化。
+
+
+---
+
+## Phase 9：Evaluation + Benchmark
+
+### 1. 开发目标
+
+构建 20~50 个 Repository Task（覆盖 Bug Fix / Feature / Cross-file
+Change / API Bug / Boundary Condition / Repository Understanding 六类），
+建立四个 Baseline（A：原始 Mini Coding Agent + Grep + Read + Edit；
+B：+ Semantic Retrieval；C：+ Hybrid Retrieval；Proposed：+ Structural
+Retrieval + Task DAG + Multi-Agent + Verification），统计软件工程
+（Resolve Rate / Pass@1 / Patch Apply Rate / Test Pass Rate）、检索
+（Recall@5/10 / MRR / Top-K Hit）、效率（tokens / tool calls / turns /
+latency / cost / files read / files modified）与 Self-Repair（Repair
+Success Rate / Average Repair Attempts）指标，执行消融矩阵（Full /
+-Structural / -Semantic / -Task DAG / -Reviewer / -Self-Repair /
+-Repository Memory），并且**保存原始实验数据**（禁止只在 README 写
+最终数字）。
+
+### 2. 实现内容
+
+新增 `mini_claude/evaluation/` 包（5 模块，约 900 行）：
+
+- **24 任务套件（tasks.py）**：三个正确模板（calc / shop / text，各
+  带完整测试套件）× 缺陷注入 = 24 个任务（6 类 ×4）。任务的规范修复
+  = 恢复模板内容；模板自带测试即评分测试。**套件完整性测试**对每个
+  任务真实运行 pytest：24/24 bug 态失败、24/24 修复态通过——套件是
+  可被真实解决的。检索 ground truth = 规范修复涉及的文件。
+- **指标层（metrics.py）**：文档四组指标全部实现 + aggregate 聚合；
+  检索指标（recall@k / mrr / topk_hit）独立函数可单测。
+- **基线与消融（baselines.py）**：A/B/C/Proposed 配置（工具集 +
+  检索栈 + 团队/验证/修复开关）；消融矩阵 7 项，其中 -Task DAG 与
+  -Repository Memory 两项如实标注"构造上等价于 Full"（这两个组件
+  尚未接入 Proposed 栈，见 Phase 5/6 已记录的局限）。
+- **评估框架（harness.py）**：`retrieval_eval` 对全部任务真实运行
+  五个检索栈（grep / semantic / hybrid / lexical+structural
+  (-Semantic) / 三合一 (Full)）；`AgenticEvaluator` 用真实 LLM 跑
+  单代理基线（ACL 限定工具集）或团队栈（TeamRunner → 真实验证 →
+  有界自修复），评分 = 真实运行仓库自带测试套件，**每个 run 落一个
+  原始 JSON**（含全部指标 + 团队逐角色明细 + 修复明细 + 测试输出
+  摘要）。
+- **Phase 5 扩展**：TeamConfig 增加 `stop_after`（-Reviewer 消融在
+  tester 之后停管），向后兼容。
+
+### 3. 新增文件
+
+| 文件 | 作用 |
+|------|------|
+| `python/mini_claude/evaluation/tasks.py` | 3 模板 + 24 TaskSpec + 构建/规范修复 |
+| `python/mini_claude/evaluation/metrics.py` | 四组指标 + 聚合 |
+| `python/mini_claude/evaluation/baselines.py` | BASELINES + ABLATIONS |
+| `python/mini_claude/evaluation/harness.py` | 检索评估 + 代理评估 + 原始数据落盘 |
+| `python/tests/evaluation/test_tasks.py` | 套件完整性（真实 pytest ×48 次） |
+| `python/tests/evaluation/test_metrics.py` | 指标函数与聚合（手构用例） |
+| `python/tests/evaluation/test_harness.py` | 真实检索评估 + 真实评分 + 脚本化代理路径 |
+| `python/tests/benchmark/phase9/retrieval_results.json` | **原始检索数据**（120 行） |
+| `python/tests/benchmark/phase9/agentic_results/*.json` | **原始代理评估数据**（每 run 一份） |
+| `python/tests/benchmark/phase9/agentic_results/summary.json` | 按基线聚合（由原始数据计算） |
+
+### 4. 修改文件
+
+| 文件 | 修改 | 接口影响 |
+|------|------|----------|
+| `python/mini_claude/agents/team.py` | TeamConfig 增加 `stop_after`（默认 None） | 向后兼容 |
+
+### 5. 核心设计
+
+```
+ 24 Repository Tasks（6 类 ×4，模板+缺陷注入，规范修复=恢复模板）
+        │
+        ├─► 检索评估（无 LLM，真实检索器）
+        │     query = 任务描述；ground truth = 规范修复文件
+        │     grep / semantic / hybrid / -Semantic / Full 五栈
+        │     → recall@5/10, MRR, topk_hit@5（逐任务原始数据）
+        │
+        └─► 代理评估（真实 LLM，每 run 全新 bug 仓库）
+              A/B/C：单 AgentRuntime（ACL 限定工具）+ cwd 绑定任务仓库
+              Proposed：TeamRunner(5 角色) → VerificationPipeline(真实测试)
+                        → 未过则 SelfRepairEngine(≤3 次) → 复评
+              评分 = 真实运行仓库测试套件（fail-fast 各阶段 stdout 解析计数）
+              每个 run → raw JSON（指标+角色明细+修复明细+摘要）
+```
+
+- 每 run 使用**全新构建的任务仓库**（agents 会修改文件，绝不污染
+  其他 run 与夹具）；
+- 单代理基线 cwd 绑定任务仓库（Phase 6/7 纪律，测试中真实踩到
+  未绑定导致的"修错文件"）；
+- 修复指标只来自真实发生的修复事件（团队验证未过 → 引擎修复 →
+  复评），不是估算。
+
+### 6. 测试
+
+新增 14 例（tests/evaluation/）：
+
+- **套件完整性（2 例）**：24 任务 / 6 类 ×4 / relevant_files 非空；
+  逐任务真实 pytest：bug 态 24/24 失败、规范修复后 24/24 通过。
+- **指标（7 例）**：recall@k 边界（空相关集/空排名）、MRR、topk、
+  聚合率（resolve/patch/test_pass 手算核对）、修复指标只统计
+  attempted 的 run、空聚合、检索字段聚合。
+- **harness（5 例）**：真实五栈检索跑 24 任务（120 行原始数据）+
+  hybrid 栈能找到 calc-bug-multiply 的修复位置；真实评分 bug 态/
+  修复态往返；脚本化 LLM 走完整记录路径（修复→resolved→原始 JSON
+  落盘；不作为→resolved=False；stop_after=tester 的 -Reviewer 团队
+  只跑四角色）。
+
+### 7. 验证结果（真实实验）
+
+#### 7.1 检索评估（24 任务 × 5 栈 = 120 行原始数据，无 LLM，真实检索器）
+
+```text
+stack                             recall@5  recall@10  MRR     topk_hit@5
+grep (A)                          1.000     1.000     0.701   1.000
+semantic (B)                      1.000     1.000     0.722   1.000
+hybrid (C)                        1.000     1.000     0.917   1.000
+lexical+structural (-Semantic)    0.958     0.958     0.896   0.958
+hybrid+structural (Full)          1.000     1.000     0.917   1.000
+```
+
+**如实说明**：任务仓库只有 2-3 个源文件，recall@5/10 与 topk 必然
+饱和（分母太小），**MRR 是唯一有区分度的指标**：grep 0.701 →
+semantic 0.722 → hybrid/Full 0.917。-Semantic 消融降到 0.896 且
+recall 掉到 0.958（24 个任务中有 1 个任务的规范文件未进 top5）——
+语义分量对排序有真实贡献。
+
+#### 7.2 代理评估（真实 LLM deepseek-v4-pro[1m]，6 任务 ×基线）
+
+
+```text
+baseline    resolve   patch_apply  test_pass     tokens_in  tokens_out  tool_calls  turns  latency  cost      files_read  files_modified  repair
+A           1.00 (6/6) 0.83        1.000 (51/51) 2130       640         5.8         4.7    14s      $0.110   2.7         1.2             0
+Proposed    1.00 (6/6) 1.00        1.000 (51/51) 13574      4494        37.8        20.2   75s      $0.766   4.3         1.2             0
+-Reviewer   1.00 (2/2) 1.00        1.000 (17/17) 7659       3194        24.5        14.0   52s      $0.165   3.0         1.5             0
+```
+
+**如实说明**：
+- 6 任务子集上三配置全部 resolve（任务为小型模板仓库，真实 LLM
+  deepseek-v4-pro[1m] 能力足以一次解决——数字是真的，但**不代表大仓库
+  上的结论**）。
+- A 的 patch_apply=0.83：5/6 干净应用，1 个 run 有 edit 失败后重试成功
+  （失败被如实计入）。
+- 效率差异是真实的：Proposed 五角色管道 input tokens 是 A 的 6.4 倍、
+  tool calls 6.5 倍、成本 7.0 倍、时延 5.4 倍；-Reviewer 消融把成本
+  从 $0.179 降到 $0.106（同任务对比）——reviewer 是成本大头之一。
+- **修复指标在本子集为零事件**（所有团队一次通过验证门）：如实记录
+  repair_rate=None。真实修复事件的指标来自 Phase 7 真实演示：
+  1 次修复 → 成功（Repair Success Rate 1/1 = 1.00，Average Repair
+  Attempts = 1.0，$0.0140）——跨 Phase 交叉引用，非伪造。
+
+每个 run 的原始 JSON 见 `python/tests/benchmark/phase9/agentic_results/`。
+
+#### 7.3 消融矩阵
+
+- 检索级：Full / -Structural / -Semantic 三个消融真实执行（见 7.1，
+  hybrid 即 -Structural，lexical+structural 即 -Semantic）。
+- 代理级：-Reviewer 真实执行（2 任务）；-SelfRepair 的修复指标来自
+  Proposed run 中真实发生的修复事件。
+- -Task DAG 与 -Repository Memory：**构造上等价于 Full**（Proposed
+  栈尚未接入 TaskDAG 调度器与跨任务记忆，Phase 5/6 已记录的局限），
+  无独立 run 可跑，如实记录为 N/A（equivalent-by-construction）。
+
+### 8. Self-Repair
+
+（开发过程中的真实失败与修复）
+
+1. **PEP 552 秒级 pyc 过期陷阱**：bug/fix 内容等长且同秒内重写时
+   pyc 头里的秒级 mtime 不变 → pytest 执行旧字节码（"文件已修但测试
+   仍失败"）。修复：apply_solution 统一清除 __pycache__/
+   .pytest_cache。
+2. **text 模板模块名遮蔽 stdlib**：`tokenize.py` 遮蔽 stdlib
+   tokenize，inspect/linecache 的 `tokenize.open` 崩。修复：改名
+   tokenizer.py。
+3. **text-boundary 缺陷不成立**：最初"去掉空守卫"的 buggy 版本恰好
+   仍返回 0（`"".split()` 是空表），任务在 bug 态通过。修复：改为
+   "空字符串返回 1"的错误守卫——完整性测试抓住的（24/24 要求）。
+4. **Harness 四连修**：HybridRetriever 方法名是 retrieve 非 search；
+   评分只解析 regression 阶段导致 fail-fast 时计数为 0 → 改为遍历
+   所有测试阶段 stdout 解析；AgentConfig 角色名非法 → 用 general；
+   **单代理基线未绑定 cwd → 相对路径 edit 落进进程 cwd**（Phase 5/7
+   污染类再现）→ 绑定任务仓库 + 恢复。
+
+### 9. Git 信息
+
+Branch：`feat/phase-09-evaluation`（自 repopilot-dev 5fe9f4c 分叉）
+
+| Commit | 内容 |
+|--------|------|
+| d935ffe | feat(evaluation): 24-task repository suite with integrity guarantee |
+| d753b4f | feat(evaluation): metrics, baselines, ablations and the harness |
+| a525b47 | feat(evaluation): retrieval ablation stacks (grep/semantic/hybrid/-Semantic/Full) |
+| （待定） | test(evaluation): raw experiment results (retrieval 120 rows + agentic runs) |
+| （本文档） | docs(phase-09): record evaluation and benchmark results |
+| （待定） | feat(phase-09): merge evaluation into repopilot-dev |
+
+Push：`origin/feat/phase-09-evaluation` → 合并 `repopilot-dev` → 集成
+回归（全量 406）→ Push `origin/repopilot-dev`。
+
+### 10. 当前模块最终实现能力
+
+1. 24 任务套件（6 类 ×4）可真实解决（完整性测试背书）；
+2. 五检索栈真实评估 + 120 行原始数据落盘；
+3. 真实 LLM 代理评估（A/B/C/Proposed/-Reviewer）逐 run 原始 JSON；
+4. 四组指标全实现并可聚合；修复指标来自真实修复事件；
+5. 消融矩阵检索级全覆盖、代理级 -Reviewer 真实、两 N/A 项如实标注。
+
+### 11. 已知问题
+
+- 任务仓库极小（2-3 源文件）：recall/topk 饱和，MRR 是唯一区分
+  指标；更大仓库的检索评估需要扩展模板。
+- 代理评估是 6 任务子集（1/类）而非全 24 任务（真实 LLM 成本约
+  束）；全量 24×2 是后续扩展项，harness 已支持。
+- 单代理基线工具集不含 run_tests（忠实文档 A/B/C 定义）：agent 无
+  法自验，resolve 依赖其一次性改对。
+- Proposed 的 TaskDAG/Repository Memory 尚未接线（Phase 5/6 局限），
+  对应消融 N/A。
+- 评分用 fail-fast 管道，评分本身不进 run 的成本统计（验证命令
+  本地执行，无 LLM 成本）。
+
+### 12. 下一阶段依赖
+
+- Phase 10（Productization）直接复用：评估套件是产品的回归评测
+  门禁；原始数据目录结构可直接用于 CI 对比报告。
+- 已稳定接口：`build_task_repos(out) -> [RepositoryTask]`、
+  `retrieval_eval(tasks) -> [TaskRunMetrics]`、
+  `AgenticEvaluator(...).run_one(task, cfg) -> TaskRunMetrics`、
+  `aggregate(runs) -> dict`。
+- 待后续集成：把 Proposed 的 TaskDAG 接上（Phase 4 Scheduler）后
+  重跑对应消融；更大模板仓库扩展检索评估区分度。

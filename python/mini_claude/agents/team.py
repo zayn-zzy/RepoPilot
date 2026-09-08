@@ -43,6 +43,9 @@ class TeamConfig:
     # team's file writes and diffs can never touch the main workspace.
     # None keeps the Phase 5 behavior (cwd = index root).
     worktree: Any | None = None
+    # Phase 9: run the pipeline only up to (and including) this role —
+    # the evaluation's -Reviewer ablation stops after the tester.
+    stop_after: str | None = None
 
 
 @dataclass
@@ -109,6 +112,8 @@ class TeamRunner:
                 # artifact signals failure; the reviewer still gets the last word
                 # only when the predecessors produced output.
                 if role in ("planner", "explorer", "coder", "tester") and outcome.artifact is None:
+                    break
+                if self.config.stop_after is not None and role == self.config.stop_after:
                     break
         finally:
             os.chdir(previous_cwd)

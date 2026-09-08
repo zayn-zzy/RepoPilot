@@ -1,0 +1,27 @@
+{
+  "task_id": "shop-api-final-price",
+  "category": "api_bug",
+  "baseline": "A",
+  "resolved": true,
+  "tests_passed": 7,
+  "tests_total": 7,
+  "patch_applied": true,
+  "files_modified": 1,
+  "recall@5": null,
+  "recall@10": null,
+  "mrr": null,
+  "topk_hit@5": null,
+  "input_tokens": 2183,
+  "output_tokens": 677,
+  "tool_calls": 7,
+  "turns": 7,
+  "latency_s": 16.44,
+  "cost_usd": 0.019853,
+  "files_read": 4,
+  "repair_attempts": 0,
+  "repair_success": null,
+  "detail": {
+    "summary": ".......                                                                  [100%]\n7 passed in 0.01s\n",
+    "final_text": "[thinking] We need solve. Need inspect repo. We have tools read_file, edit_file, grep_search. Let's search.\n  [thinking] Need fix final_price to add tax. Need inspect tests to understand expected rounding maybe.\n  [thinking] Need minimal change. final_price should apply discount then add tax. likely discounted = apply_discount(price, discount); return discounted * (1 + tax_rate). Test 100 * 0.8 = 80; *1.1=88.0. Good. edit.\n  [thinking] Need maybe run tests? We don't have run tool. Could mention."
+  }
+}

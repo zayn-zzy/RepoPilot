@@ -1,0 +1,27 @@
+{
+  "task_id": "calc-bug-multiply",
+  "category": "bug_fix",
+  "baseline": "A",
+  "resolved": true,
+  "tests_passed": 10,
+  "tests_total": 10,
+  "patch_applied": true,
+  "files_modified": 1,
+  "recall@5": null,
+  "recall@10": null,
+  "mrr": null,
+  "topk_hit@5": null,
+  "input_tokens": 1999,
+  "output_tokens": 376,
+  "tool_calls": 5,
+  "turns": 5,
+  "latency_s": 10.49,
+  "cost_usd": 0.013173,
+  "files_read": 2,
+  "repair_attempts": 0,
+  "repair_success": null,
+  "detail": {
+    "summary": "..........                                                               [100%]\n10 passed in 0.01s\n",
+    "final_text": "[thinking] We need solve. Need inspect repo. Use tools.\n  [thinking] Need change return a+b to a*b. Minimal.\n  [thinking] Need maybe run tests? We don't have run tool. We can search tests.\nChanged `multiply()` in `calc.py` to return `a * b` instead of `a + b`. This makes `multiply(3, 4)` return `12`, matching the expected multiplication behavior in the test suite."
+  }
+}

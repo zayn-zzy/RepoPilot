@@ -1,0 +1,27 @@
+{
+  "task_id": "calc-boundary-mean-empty",
+  "category": "boundary",
+  "baseline": "A",
+  "resolved": true,
+  "tests_passed": 10,
+  "tests_total": 10,
+  "patch_applied": true,
+  "files_modified": 1,
+  "recall@5": null,
+  "recall@10": null,
+  "mrr": null,
+  "topk_hit@5": null,
+  "input_tokens": 1257,
+  "output_tokens": 439,
+  "tool_calls": 5,
+  "turns": 3,
+  "latency_s": 10.7,
+  "cost_usd": 0.011546,
+  "files_read": 2,
+  "repair_attempts": 0,
+  "repair_success": null,
+  "detail": {
+    "summary": "..........                                                               [100%]\n10 passed in 0.01s\n",
+    "final_text": "[thinking] We need inspect repository. Need search files. Let's start with grep for mean function and tests.\n  [thinking] Need minimal fix: in mean guard empty sequence before division. But what about other empty sequences? Test only mean([]). Also median empty would IndexError? not documented? task says mean empty ValueError. Implement: if len(values)==0: raise ValueError(\"mean of empty sequence\"). Could be at boundary. Need ensure returns 4.0: sum/len gives float? sum ints / int in Python3 giv"
+  }
+}

@@ -1,0 +1,3907 @@
+[
+  {
+    "task_id": "calc-bug-multiply",
+    "category": "bug_fix",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-bug-multiply",
+    "category": "bug_fix",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-bug-multiply",
+    "category": "bug_fix",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-bug-multiply",
+    "category": "bug_fix",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-bug-multiply",
+    "category": "bug_fix",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-bug-subtract",
+    "category": "bug_fix",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-bug-subtract",
+    "category": "bug_fix",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-bug-subtract",
+    "category": "bug_fix",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-bug-subtract",
+    "category": "bug_fix",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-bug-subtract",
+    "category": "bug_fix",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-bug-discount",
+    "category": "bug_fix",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py",
+        "report.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-bug-discount",
+    "category": "bug_fix",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py",
+        "report.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-bug-discount",
+    "category": "bug_fix",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py",
+        "report.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-bug-discount",
+    "category": "bug_fix",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py",
+        "report.py",
+        "tests/test_shop.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-bug-discount",
+    "category": "bug_fix",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py",
+        "report.py",
+        "tests/test_shop.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-bug-tokenize",
+    "category": "bug_fix",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-bug-tokenize",
+    "category": "bug_fix",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-bug-tokenize",
+    "category": "bug_fix",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-bug-tokenize",
+    "category": "bug_fix",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-bug-tokenize",
+    "category": "bug_fix",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-api-divide",
+    "category": "api_bug",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-api-divide",
+    "category": "api_bug",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-api-divide",
+    "category": "api_bug",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-api-divide",
+    "category": "api_bug",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-api-divide",
+    "category": "api_bug",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-api-total",
+    "category": "api_bug",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-api-total",
+    "category": "api_bug",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-api-total",
+    "category": "api_bug",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-api-total",
+    "category": "api_bug",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py",
+        "tests/test_calc.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-api-total",
+    "category": "api_bug",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py",
+        "tests/test_calc.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-api-final-price",
+    "category": "api_bug",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.3333333333333333,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "report.py",
+        "order.py",
+        "pricing.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-api-final-price",
+    "category": "api_bug",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py",
+        "report.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-api-final-price",
+    "category": "api_bug",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py",
+        "report.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-api-final-price",
+    "category": "api_bug",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py",
+        "tests/test_shop.py",
+        "report.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-api-final-price",
+    "category": "api_bug",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py",
+        "report.py",
+        "tests/test_shop.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-api-word-count",
+    "category": "api_bug",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "tokenizer.py",
+        "normalize.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-api-word-count",
+    "category": "api_bug",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-api-word-count",
+    "category": "api_bug",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "tokenizer.py",
+        "normalize.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-api-word-count",
+    "category": "api_bug",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "tokenizer.py",
+        "tests/test_text.py",
+        "normalize.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-api-word-count",
+    "category": "api_bug",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "tokenizer.py",
+        "tests/test_text.py",
+        "normalize.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-boundary-mean-empty",
+    "category": "boundary",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-boundary-mean-empty",
+    "category": "boundary",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-boundary-mean-empty",
+    "category": "boundary",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-boundary-mean-empty",
+    "category": "boundary",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-boundary-mean-empty",
+    "category": "boundary",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-boundary-median-even",
+    "category": "boundary",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-boundary-median-even",
+    "category": "boundary",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-boundary-median-even",
+    "category": "boundary",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-boundary-median-even",
+    "category": "boundary",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-boundary-median-even",
+    "category": "boundary",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-boundary-discount",
+    "category": "boundary",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "report.py",
+        "pricing.py",
+        "order.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-boundary-discount",
+    "category": "boundary",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "order.py",
+        "pricing.py",
+        "report.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-boundary-discount",
+    "category": "boundary",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "report.py",
+        "order.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-boundary-discount",
+    "category": "boundary",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "report.py",
+        "order.py",
+        "tests/test_shop.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-boundary-discount",
+    "category": "boundary",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "report.py",
+        "order.py",
+        "tests/test_shop.py"
+      ],
+      "relevant": [
+        "pricing.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-boundary-empty-count",
+    "category": "boundary",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-boundary-empty-count",
+    "category": "boundary",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-boundary-empty-count",
+    "category": "boundary",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "tokenizer.py",
+        "normalize.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-boundary-empty-count",
+    "category": "boundary",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "tokenizer.py",
+        "tests/test_text.py",
+        "normalize.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-boundary-empty-count",
+    "category": "boundary",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "tokenizer.py",
+        "tests/test_text.py",
+        "normalize.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-feature-product",
+    "category": "feature",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-feature-product",
+    "category": "feature",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-feature-product",
+    "category": "feature",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-feature-product",
+    "category": "feature",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-feature-product",
+    "category": "feature",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py"
+      ],
+      "relevant": [
+        "calc.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-feature-coupon",
+    "category": "feature",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.3333333333333333,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "report.py",
+        "order.py"
+      ],
+      "relevant": [
+        "order.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-feature-coupon",
+    "category": "feature",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py",
+        "report.py"
+      ],
+      "relevant": [
+        "order.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-feature-coupon",
+    "category": "feature",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "order.py",
+        "pricing.py",
+        "report.py"
+      ],
+      "relevant": [
+        "order.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-feature-coupon",
+    "category": "feature",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "order.py",
+        "pricing.py",
+        "tests/test_shop.py",
+        "report.py"
+      ],
+      "relevant": [
+        "order.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-feature-coupon",
+    "category": "feature",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "order.py",
+        "pricing.py",
+        "tests/test_shop.py",
+        "report.py"
+      ],
+      "relevant": [
+        "order.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-feature-multiline-count",
+    "category": "feature",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "tokenizer.py",
+        "normalize.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-feature-multiline-count",
+    "category": "feature",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-feature-multiline-count",
+    "category": "feature",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "tokenizer.py",
+        "normalize.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-feature-multiline-count",
+    "category": "feature",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "tokenizer.py",
+        "tests/test_text.py",
+        "normalize.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-feature-multiline-count",
+    "category": "feature",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "tokenizer.py",
+        "tests/test_text.py",
+        "normalize.py"
+      ],
+      "relevant": [
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-feature-max-price",
+    "category": "feature",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.3333333333333333,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py",
+        "report.py"
+      ],
+      "relevant": [
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-feature-max-price",
+    "category": "feature",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.3333333333333333,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py",
+        "report.py"
+      ],
+      "relevant": [
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-feature-max-price",
+    "category": "feature",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "report.py",
+        "pricing.py",
+        "order.py"
+      ],
+      "relevant": [
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-feature-max-price",
+    "category": "feature",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "report.py"
+      ],
+      "relevant": [
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-feature-max-price",
+    "category": "feature",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "report.py",
+        "pricing.py",
+        "order.py"
+      ],
+      "relevant": [
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-cross-add-total",
+    "category": "cross_file",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py",
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-cross-add-total",
+    "category": "cross_file",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py",
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-cross-add-total",
+    "category": "cross_file",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py",
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-cross-add-total",
+    "category": "cross_file",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py",
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-cross-add-total",
+    "category": "cross_file",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "calc.py",
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-cross-report-pricing",
+    "category": "cross_file",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "report.py",
+        "pricing.py",
+        "order.py"
+      ],
+      "relevant": [
+        "pricing.py",
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-cross-report-pricing",
+    "category": "cross_file",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "report.py",
+        "order.py"
+      ],
+      "relevant": [
+        "pricing.py",
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-cross-report-pricing",
+    "category": "cross_file",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "report.py",
+        "order.py"
+      ],
+      "relevant": [
+        "pricing.py",
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-cross-report-pricing",
+    "category": "cross_file",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "report.py",
+        "order.py",
+        "tests/test_shop.py"
+      ],
+      "relevant": [
+        "pricing.py",
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-cross-report-pricing",
+    "category": "cross_file",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "report.py",
+        "order.py",
+        "tests/test_shop.py"
+      ],
+      "relevant": [
+        "pricing.py",
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-cross-normalize-tokenize",
+    "category": "cross_file",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "normalize.py",
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-cross-normalize-tokenize",
+    "category": "cross_file",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "normalize.py",
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-cross-normalize-tokenize",
+    "category": "cross_file",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "normalize.py",
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-cross-normalize-tokenize",
+    "category": "cross_file",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "normalize.py",
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-cross-normalize-tokenize",
+    "category": "cross_file",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "normalize.py",
+        "tokenizer.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-cross-order-report",
+    "category": "cross_file",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "report.py",
+        "order.py"
+      ],
+      "relevant": [
+        "order.py",
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-cross-order-report",
+    "category": "cross_file",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "order.py",
+        "report.py",
+        "pricing.py"
+      ],
+      "relevant": [
+        "order.py",
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-cross-order-report",
+    "category": "cross_file",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "report.py",
+        "order.py",
+        "pricing.py"
+      ],
+      "relevant": [
+        "order.py",
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-cross-order-report",
+    "category": "cross_file",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "report.py",
+        "order.py",
+        "pricing.py"
+      ],
+      "relevant": [
+        "order.py",
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-cross-order-report",
+    "category": "cross_file",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "report.py",
+        "order.py",
+        "pricing.py"
+      ],
+      "relevant": [
+        "order.py",
+        "report.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-understanding-total",
+    "category": "understanding",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-understanding-total",
+    "category": "understanding",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-understanding-total",
+    "category": "understanding",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-understanding-total",
+    "category": "understanding",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-understanding-total",
+    "category": "understanding",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "stats.py",
+        "calc.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-understanding-rates",
+    "category": "understanding",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.3333333333333333,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "report.py",
+        "pricing.py",
+        "order.py"
+      ],
+      "relevant": [
+        "order.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-understanding-rates",
+    "category": "understanding",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py"
+      ],
+      "relevant": [
+        "order.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-understanding-rates",
+    "category": "understanding",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py"
+      ],
+      "relevant": [
+        "order.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-understanding-rates",
+    "category": "understanding",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 0.0,
+    "recall@10": 0.0,
+    "mrr": 0.0,
+    "topk_hit@5": 0.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [],
+      "relevant": [
+        "order.py"
+      ]
+    }
+  },
+  {
+    "task_id": "shop-understanding-rates",
+    "category": "understanding",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "pricing.py",
+        "order.py"
+      ],
+      "relevant": [
+        "order.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-understanding-whitespace",
+    "category": "understanding",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "normalize.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-understanding-whitespace",
+    "category": "understanding",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "normalize.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-understanding-whitespace",
+    "category": "understanding",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "normalize.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-understanding-whitespace",
+    "category": "understanding",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py"
+      ],
+      "relevant": [
+        "normalize.py"
+      ]
+    }
+  },
+  {
+    "task_id": "text-understanding-whitespace",
+    "category": "understanding",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 1.0,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "normalize.py",
+        "tokenizer.py"
+      ],
+      "relevant": [
+        "normalize.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-understanding-mean",
+    "category": "understanding",
+    "baseline": "grep",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-understanding-mean",
+    "category": "understanding",
+    "baseline": "semantic",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-understanding-mean",
+    "category": "understanding",
+    "baseline": "hybrid",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-understanding-mean",
+    "category": "understanding",
+    "baseline": "lexical+structural (-Semantic)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  },
+  {
+    "task_id": "calc-understanding-mean",
+    "category": "understanding",
+    "baseline": "hybrid+structural (Full)",
+    "resolved": false,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "patch_applied": false,
+    "files_modified": 0,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr": 0.5,
+    "topk_hit@5": 1.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "tool_calls": 0,
+    "turns": 0,
+    "latency_s": 0.0,
+    "cost_usd": 0.0,
+    "files_read": 0,
+    "repair_attempts": 0,
+    "repair_success": null,
+    "detail": {
+      "ranked": [
+        "calc.py",
+        "stats.py"
+      ],
+      "relevant": [
+        "stats.py"
+      ]
+    }
+  }
+]
