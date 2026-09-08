@@ -1,0 +1,27 @@
+{
+  "task_id": "shop-cross-report-pricing",
+  "category": "cross_file",
+  "baseline": "A",
+  "resolved": true,
+  "tests_passed": 7,
+  "tests_total": 7,
+  "patch_applied": true,
+  "files_modified": 2,
+  "recall@5": null,
+  "recall@10": null,
+  "mrr": null,
+  "topk_hit@5": null,
+  "input_tokens": 2970,
+  "output_tokens": 856,
+  "tool_calls": 7,
+  "turns": 3,
+  "latency_s": 14.75,
+  "cost_usd": 0.023555,
+  "files_read": 4,
+  "repair_attempts": 0,
+  "repair_success": null,
+  "detail": {
+    "summary": ".......                                                                  [100%]\n7 passed in 0.01s\n",
+    "final_text": "[thinking] We need to inspect repo. Need search files.\n  [thinking] We have files. Need fix report.py hardcodes 10% tax? Actually line prices = [i[\"price\"] * 0.9 for i in items]. That's a 10% discount, not tax. The defect says \"report.py hardcodes a 10% tax, and pricing.py's apply_discount uses the inverse formula.\" Let's read files fully maybe.\n  [thinking] Need minimal changes. pricing.apply_discount should return price * (1 - discount) instead of (1 + discount). report.summarize should use fi"
+  }
+}

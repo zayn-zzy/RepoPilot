@@ -1,0 +1,27 @@
+{
+  "task_id": "shop-understanding-rates",
+  "category": "understanding",
+  "baseline": "A",
+  "resolved": true,
+  "tests_passed": 7,
+  "tests_total": 7,
+  "patch_applied": false,
+  "files_modified": 1,
+  "recall@5": null,
+  "recall@10": null,
+  "mrr": null,
+  "topk_hit@5": null,
+  "input_tokens": 2640,
+  "output_tokens": 839,
+  "tool_calls": 5,
+  "turns": 5,
+  "latency_s": 16.14,
+  "cost_usd": 0.024038,
+  "files_read": 1,
+  "repair_attempts": 0,
+  "repair_success": null,
+  "detail": {
+    "summary": ".......                                                                  [100%]\n7 passed in 0.01s\n",
+    "final_text": "[thinking] We need to inspect repo. Let's list files.\n  [thinking] Need understand defect. \"purchase has both a promotional rate and a government rate applied, final charge wrong. One of two rates applied in other's place.\" Current pricing: final_price(price, discount, tax_rate). order_total calls final_price(item[\"price\"], tax_rate, discount) - swapped! Tests show order_total(items, discount=0.2, tax_rate=0.1) == 132.0. Let's compute correct final_price for 100 and 50 with discount 0.2 tax 0.1:"
+  }
+}
