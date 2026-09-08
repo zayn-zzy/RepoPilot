@@ -32,6 +32,7 @@ from typing import Any, Callable
 from ..evaluation import grade
 from ..planning import Requirement, RequirementParser, TaskDAG, TaskNode
 from ..planning.dag import Scheduler
+from ..sandbox import SandboxedCommandRunner, set_sandbox
 from ..tools import set_work_root
 from ..verify import SelfRepairEngine, VerificationPipeline
 from ..worktree import (
@@ -83,6 +84,7 @@ class DagRunReport:
     commit: str = ""
     pr: Any | None = None                     # PrInfo, attached by the product layer
     runlog_records: list = field(default_factory=list)
+    sandbox: str = ""                         # honest record of where commands ran
     success: bool = False
     note: str = ""
 
@@ -108,6 +110,8 @@ class DagRunReport:
             lines.append(line)
         if self.worktree is not None:
             lines.append(f"  worktree: {self.worktree.path} ({self.worktree.branch})")
+        if self.sandbox:
+            lines.append(f"  sandbox: {self.sandbox}")
         if self.final_verification:
             lines.append(
                 f"  final verification: "
@@ -149,11 +153,19 @@ class DagRunner:
                  jobs: int = 1,
                  base_branch: str | None = None,
                  commit: bool = True,
+                 sandbox: str = "auto",        # off | auto | on (Phase 12)
+                 sandbox_builder: Callable[[Path], Any] | None = None,
                  after_build: AfterBuild | None = None,
                  manager: WorktreeManager | None = None,
                  recorder_factory: RecorderFactory | None = None,
                  logger: Any | None = None,
                  ):
+        """``sandbox`` is the Phase 12 command-execution mode for every
+        task's shell/tests/verification: "off" = host (pre-wiring),
+        "auto" = docker when available else host with an honest note,
+        "on" = docker required (unavailable docker fails the run up
+        front). ``sandbox_builder(worktree_path)`` injects the
+        per-task SandboxedCommandRunner (tests)."""
         self.root = Path(root).resolve()
         self.plan = plan
         self.task_id = task_id
@@ -168,11 +180,14 @@ class DagRunner:
         self.jobs = jobs
         self.base_branch = base_branch
         self.commit = commit
+        self.sandbox = sandbox
+        self._sandbox_builder = sandbox_builder
         self._after_build = after_build
         self.manager = manager
         self._recorder_factory = recorder_factory
         self.logger = logger
         self._merge_lock = threading.Lock()
+        self._sandbox_runners: list = []      # per-task runners (stats) + final
 
     # ─── entry point ──────────────────────────────────────────
 
@@ -184,6 +199,19 @@ class DagRunner:
         if self.jobs < 1:
             report.note = f"jobs must be >= 1, got {self.jobs}"
             return report
+        if self.sandbox not in ("off", "auto", "on"):
+            report.note = f"unknown sandbox mode {self.sandbox!r} (off|auto|on)"
+            return report
+        # "on" demands docker — probe before any worktree is created so
+        # the refusal is up front and unambiguous (no silent host fallback).
+        if self.sandbox == "on" and self._sandbox_builder is None:
+            probe = SandboxedCommandRunner(self.root, mode="on")
+            if not probe.available:
+                report.note = (f"sandbox mode 'on' but docker is unavailable "
+                               f"({probe._probe_reason or 'daemon unreachable'}) "
+                               f"— no task ran; use --sandbox auto to fall back "
+                               f"to host execution, or install/start docker")
+                return report
         validation = self.plan.validate()
         if not validation.valid:
             report.note = "invalid plan: " + "; ".join(validation.errors)
@@ -275,16 +303,28 @@ class DagRunner:
         # (thread-local root) — parallel task threads can never touch each
         # other's checkout, and the process cwd becomes irrelevant.
         set_work_root(str(info.path))
+        sandbox = self._build_sandbox(info.path)
+        if sandbox is not None:
+            if sandbox.mode == "on" and not sandbox.available:
+                outcome.status = "failed"
+                outcome.error = ("sandbox mode 'on' but docker is unavailable"
+                                 f" ({sandbox._probe_reason or 'daemon unreachable'})")
+                set_work_root(None)
+                return outcome
+            set_sandbox(sandbox)
+            self._sandbox_runners.append(sandbox)
         try:
             self._run_task_body(task, info, integration, requirement, outcome,
-                                report)
+                                report, sandbox)
         finally:
+            set_sandbox(None)
             set_work_root(None)
         return outcome
 
     def _run_task_body(self, task: TaskNode, info: WorktreeInfo,
                        integration: WorktreeInfo, requirement: Requirement,
-                       outcome: TaskOutcome, report: DagRunReport) -> None:
+                       outcome: TaskOutcome, report: DagRunReport,
+                       sandbox=None) -> None:
         run_result = None
         recorder = None
         try:
@@ -297,7 +337,8 @@ class DagRunner:
             self._record(recorder, run_result, outcome, report)
             return
 
-        outcome.verification, outcome.repair = self._verify_and_repair(task, info)
+        outcome.verification, outcome.repair = self._verify_and_repair(
+            task, info, sandbox)
         outcome.cost_usd += outcome.repair.get("total_cost_usd", 0.0)
 
         _purge_caches(info.path)
@@ -404,15 +445,16 @@ class DagRunner:
         ]
         return "\n".join(parts)
 
-    def _verify_and_repair(self, task: TaskNode,
-                           info: WorktreeInfo) -> tuple[dict, dict]:
+    def _verify_and_repair(self, task: TaskNode, info: WorktreeInfo,
+                           sandbox=None) -> tuple[dict, dict]:
         """The repo's own tests for real (grade), then the bounded
-        self-repair loop only when verification fails (Phase 7)."""
-        verification = self._grade_dict(info.path)
+        self-repair loop only when verification fails (Phase 7). Every
+        command goes through the task's sandbox runner (Phase 12)."""
+        verification = self._grade_dict(info.path, sandbox)
         repair = {"attempts": 0, "success": None, "total_cost_usd": 0.0}
         if verification["passed"]:
             return verification, repair
-        failure = VerificationPipeline(info.path).run().first_failure
+        failure = VerificationPipeline(info.path, sandbox=sandbox).run().first_failure
         if failure is None:
             return verification, repair
         engine = SelfRepairEngine(
@@ -423,6 +465,7 @@ class DagRunner:
             max_repair_attempts=self.max_repair_attempts,
             after_build=(lambda rt: self._after_build(rt, task))
                         if self._after_build is not None else None,
+            sandbox=sandbox,
         )
         try:
             result = asyncio.run(engine.repair(failure))
@@ -431,12 +474,12 @@ class DagRunner:
             return verification, repair
         repair = {"attempts": len(result.attempts), "success": result.fixed,
                   "total_cost_usd": result.total_cost_usd}
-        verification = self._grade_dict(info.path)
+        verification = self._grade_dict(info.path, sandbox)
         return verification, repair
 
     @staticmethod
-    def _grade_dict(path: Path) -> dict:
-        resolved, passed, total, summary = grade(path)
+    def _grade_dict(path: Path, sandbox=None) -> dict:
+        resolved, passed, total, summary = grade(path, sandbox=sandbox)
         return {"passed": resolved, "tests_passed": passed,
                 "tests_total": total, "summary": summary[:500]}
 
@@ -489,11 +532,43 @@ class DagRunner:
         order = report.plan.topological_order()
         report.outcomes.sort(key=lambda o: order.index(o.task_id))
 
+    def _build_sandbox(self, path: Path):
+        """The per-task SandboxedCommandRunner (Phase 12). The workspace
+        mount is the task worktree — disposable and cache-purged, so a
+        writable mount is safe; the container still gets network=none,
+        filtered env, non-root, cpu/memory/pids limits."""
+        if self._sandbox_builder is not None:
+            return self._sandbox_builder(path)
+        if self.sandbox == "off":
+            return None
+        from ..sandbox import SandboxPolicy
+        policy = SandboxPolicy(workspace=Path(path),
+                               workspace_writable=True)
+        return SandboxedCommandRunner(path, policy=policy, mode=self.sandbox)
+
     def _finalize(self, report: DagRunReport, integration: WorktreeInfo) -> None:
+        final_sandbox = None
+        if self.sandbox != "off":
+            final_sandbox = self._build_sandbox(integration.path)
+            if final_sandbox is not None:
+                self._sandbox_runners.append(final_sandbox)
         try:
-            report.final_verification = self._grade_dict(integration.path)
+            report.final_verification = self._grade_dict(integration.path,
+                                                         final_sandbox)
         except Exception as e:
             report.note = f"final verification failed: {e}"
+        # The honest aggregate: where did commands actually run?
+        labels = list(dict.fromkeys(r.label for r in self._sandbox_runners))
+        if labels:
+            totals = {"docker": 0, "host": 0, "blocked": 0}
+            for r in self._sandbox_runners:
+                for k in totals:
+                    totals[k] += r.stats.get(k, 0)
+            report.sandbox = "; ".join(labels) + (
+                f" — {totals['docker']} docker / {totals['host']} host / "
+                f"{totals['blocked']} blocked command(s)")
+        elif self.sandbox == "off":
+            report.sandbox = "off (host execution)"
         # Purge AFTER the final grade: the verification run itself creates
         # pycache/.pytest_cache, and those must never enter the diff.
         _purge_caches(integration.path)
