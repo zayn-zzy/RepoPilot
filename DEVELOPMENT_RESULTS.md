@@ -2233,7 +2233,7 @@ Branch：`feat/phase-10-productization`（自 repopilot-dev 34ddf91 分叉）
 | 355c740 | fix(product): purge verification artifacts from the task patch |
 | 85e6d57 | docs: rewrite README for RepoPilot with honest feature status |
 | （本文档） | docs(phase-10): record productization results and final DoD |
-| （待定） | feat(phase-10): merge productization into repopilot-dev |
+| 237321b | feat(phase-10): merge productization into repopilot-dev |
 
 Push：`origin/feat/phase-10-productization` → 合并 `repopilot-dev` →
 集成回归（全量 425）→ Push `origin/repopilot-dev`。
