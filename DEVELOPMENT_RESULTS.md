@@ -2027,7 +2027,7 @@ Branch：`feat/phase-09-evaluation`（自 repopilot-dev 5fe9f4c 分叉）
 | a525b47 | feat(evaluation): retrieval ablation stacks (grep/semantic/hybrid/-Semantic/Full) |
 | （待定） | test(evaluation): raw experiment results (retrieval 120 rows + agentic runs) |
 | （本文档） | docs(phase-09): record evaluation and benchmark results |
-| （待定） | feat(phase-09): merge evaluation into repopilot-dev |
+| efcb69b | feat(phase-09): merge evaluation into repopilot-dev |
 
 Push：`origin/feat/phase-09-evaluation` → 合并 `repopilot-dev` → 集成
 回归（全量 406）→ Push `origin/repopilot-dev`。
