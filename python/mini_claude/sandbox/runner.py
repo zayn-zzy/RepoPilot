@@ -82,7 +82,13 @@ class DockerRunner:
 
     # ─── execution ─────────────────────────────────────────────
 
-    def run(self, command: str, *, timeout_s: float | None = None) -> SandboxResult:
+    def run(self, command: str, *, timeout_s: float | None = None,
+            workspace: str | Path | None = None,
+            cwd: str | Path | None = None) -> SandboxResult:
+        """Run one command. ``workspace`` overrides the policy's mount
+        root (the DAG executor passes each task's worktree); ``cwd`` is a
+        directory inside it, translated to -w /workspace/<rel> (rejected
+        via PathTraversalGuard when it escapes)."""
         verdict = self.check(command)
         if verdict.action == "deny":
             return SandboxResult(command=command, verdict=verdict)
@@ -91,11 +97,25 @@ class DockerRunner:
                 return SandboxResult(command=command, verdict=CommandVerdict(
                     "deny", verdict.rule,
                     f"{verdict.reason} — human approval required but not given"))
-        argv = self._build_argv(command)
+        ws = (Path(workspace).resolve() if workspace is not None
+              else self.policy.workspace)
+        if ws is None:
+            return SandboxResult(command=command, verdict=CommandVerdict(
+                "deny", "no_workspace", "no workspace configured for the sandbox"))
+        cwd_rel = ""
+        if cwd is not None:
+            from .security import PathTraversalGuard
+            guard = PathTraversalGuard(ws).check(cwd)
+            if guard.action != "allow":
+                return SandboxResult(command=command, verdict=guard)
+            rel = Path(cwd).resolve().relative_to(ws)
+            cwd_rel = "" if str(rel) == "." else str(rel)
+        argv = self._build_argv(command, ws, cwd_rel)
         timeout = timeout_s if timeout_s is not None else self.policy.timeout_s
         try:
             p = self._executor(argv, capture_output=True, text=True,
-                               timeout=timeout)
+                               timeout=timeout,
+                               encoding="utf-8", errors="replace")
             return SandboxResult(
                 command=command, verdict=verdict, argv=argv, ran=True,
                 exit_code=p.returncode,
@@ -117,8 +137,10 @@ class DockerRunner:
 
     # ─── argv construction (the policy, as docker flags) ───────
 
-    def _build_argv(self, command: str) -> list[str]:
+    def _build_argv(self, command: str, ws: Path | None = None,
+                    cwd_rel: str = "") -> list[str]:
         p = self.policy
+        ws = ws or p.workspace
         argv = [self.docker_bin, "run", "--rm"]
         argv += ["--network", p.network]                 # Network Policy
         argv += ["--cpus", p.cpu_limit]                  # CPU Limit
@@ -130,16 +152,17 @@ class DockerRunner:
         if p.read_only_root:
             argv += ["--read-only",                      # Disk Restriction
                      "--tmpfs", f"/tmp:rw,size={p.tmpfs_size}"]
-        if p.workspace is not None:
+        if ws is not None:
+            mode = "rw" if p.workspace_writable else "ro"
             argv += ["--volume",                          # Workspace Restriction
-                     f"{Path(p.workspace).resolve()}:/workspace:ro"]
+                     f"{ws}:/workspace:{mode}"]
         if p.writable is not None:
             argv += ["--volume",
                      f"{Path(p.writable).resolve()}:/workspace-writable:rw"]
         env = self.container_env()                        # Env + Secret Filtering
         for name, value in sorted(env.items()):
             argv += ["--env", f"{name}={value}"]
-        argv += ["-w", "/workspace"]
+        argv += ["-w", f"/workspace/{cwd_rel}" if cwd_rel else "/workspace"]
         argv += [p.image]
         argv += ["sh", "-lc", command]                    # command as one arg
         return argv

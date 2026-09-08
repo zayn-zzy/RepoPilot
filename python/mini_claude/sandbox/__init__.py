@@ -8,6 +8,12 @@ restriction, and a DockerRunner that turns the policy into concrete
 docker flags (CPU/memory limits, wall-clock timeout, read-only
 workspace mount, network=none)."""
 
+from .command import (  # noqa: F401
+    CommandResult,
+    SandboxedCommandRunner,
+    get_sandbox,
+    set_sandbox,
+)
 from .policy import SandboxPolicy  # noqa: F401
 from .runner import DockerRunner, SandboxResult  # noqa: F401
 from .security import (  # noqa: F401
@@ -22,6 +28,10 @@ __all__ = [
     "SandboxPolicy",
     "DockerRunner",
     "SandboxResult",
+    "SandboxedCommandRunner",
+    "CommandResult",
+    "set_sandbox",
+    "get_sandbox",
     "CommandVerdict",
     "classify_command",
     "PathTraversalGuard",

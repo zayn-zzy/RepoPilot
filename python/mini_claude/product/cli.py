@@ -96,6 +96,10 @@ def main(argv: list[str] | None = None) -> int:
                             "(default: deterministic planner)")
     p_run.add_argument("--jobs", type=int, default=2,
                        help="max parallel task worktrees (default: 2; 1 = sequential)")
+    p_run.add_argument("--sandbox", choices=("auto", "on", "off"), default="auto",
+                       help="command sandbox mode: auto = docker when available "
+                            "else host (honestly reported); on = require docker; "
+                            "off = host (default: auto)")
     p_run.add_argument("--task-id", default=None,
                        help="task id for the worktree/branch (default: auto)")
     p_run.add_argument("--model", default="deepseek-v4-pro[1m]")
@@ -302,7 +306,8 @@ def _cmd_run(args) -> int:
         root, requirement, plan=plan, task_id=task_id,
         model=args.model, api_key=api_key,
         anthropic_base_url=_llm_base_url(),
-        jobs=args.jobs, commit=not args.no_commit,
+        jobs=args.jobs, sandbox=args.sandbox,
+        commit=not args.no_commit,
     ))
     print(report.summarize())
     if report.pr is not None:

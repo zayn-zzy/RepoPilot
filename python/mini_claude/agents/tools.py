@@ -199,6 +199,19 @@ def _run_git(args: list[str], cwd) -> str:
 
 
 def _run_shell(command: str, cwd, timeout_ms: int) -> str:
+    # Phase 12: run_tests/run_lint go through the thread's sandbox runner
+    # (docker) when the DAG executor bound one — with the honest host
+    # fallback note otherwise; without a sandbox the behavior is the
+    # pre-wiring host subprocess.
+    from ..sandbox import get_sandbox
+    from ..tools import _format_sandbox_result
+    sandbox = get_sandbox()
+    if sandbox is not None:
+        try:
+            result = sandbox.run(command, cwd=cwd, timeout_s=timeout_ms / 1000)
+            return _format_sandbox_result(result, timeout_ms)
+        except Exception as e:
+            return f"Error: {e}"
     try:
         result = subprocess.run(
             command, shell=True, cwd=str(cwd), capture_output=True, text=True,
