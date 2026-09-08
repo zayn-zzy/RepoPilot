@@ -72,9 +72,13 @@ class SelfRepairEngine:
                  max_cost_usd: float | None = None,
                  max_turns: int | None = None,
                  after_build: Callable[[AgentRuntime], None] | None = None,
-                 max_repair_attempts: int = MAX_REPAIR_ATTEMPTS):
+                 max_repair_attempts: int = MAX_REPAIR_ATTEMPTS,
+                 sandbox: Any | None = None):
+        """``sandbox`` (a SandboxedCommandRunner) routes the re-test
+        commands through docker, like the main pipeline."""
         self.root = Path(root).resolve()
-        self.pipeline = pipeline or VerificationPipeline(self.root)
+        self.pipeline = pipeline or VerificationPipeline(self.root, sandbox=sandbox)
+        self.sandbox = sandbox
         self.index = index
         self.llm = dict(model=model, api_key=api_key, api_base=api_base,
                         anthropic_base_url=anthropic_base_url,
@@ -207,6 +211,7 @@ class SelfRepairEngine:
             changed_files=failure.related_files or None,
             target_tests=failure.failed_tests or None,
             reviewer=self.pipeline.reviewer,
+            sandbox=self.sandbox,
         ).run()
 
 

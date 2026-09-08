@@ -455,9 +455,22 @@ def _grep_python(pattern: str, directory: str, include: str | None) -> str:
 
 
 def _run_shell(inp: dict) -> str:
+    timeout_ms = inp.get("timeout", 30000)
+    timeout_s = timeout_ms / 1000
+    # Phase 12: when this thread is bound to a sandbox (the DAG executor
+    # binds one per task), the shell command runs inside docker — with
+    # the honest host-fallback note when docker is unavailable.
+    from .sandbox import get_sandbox
+    sandbox = get_sandbox()
+    if sandbox is not None:
+        try:
+            result = sandbox.run(inp["command"], timeout_s=timeout_s)
+            return _format_sandbox_result(result, timeout_ms)
+        except Exception as e:
+            # A sandbox-layer failure must degrade to a tool error, never
+            # crash the agent loop.
+            return f"Error: {e}"
     try:
-        timeout_ms = inp.get("timeout", 30000)
-        timeout_s = timeout_ms / 1000
         result = subprocess.run(
             inp["command"],
             shell=True,
@@ -476,6 +489,24 @@ def _run_shell(inp: dict) -> str:
         return f"Command timed out after {inp.get('timeout', 30000)}ms"
     except Exception as e:
         return f"Error: {e}"
+
+
+def _format_sandbox_result(result, timeout_ms: int) -> str:
+    """SandboxResult/CommandResult → the run_shell text shape (plus the
+    honest sandbox note, so agents and the runlog see where it ran)."""
+    if result.sandbox == "blocked":
+        reason = result.stderr or (result.verdict.reason if result.verdict else "")
+        return f"Command blocked by the sandbox: {reason}"
+    if result.returncode is None:
+        return f"Command timed out after {timeout_ms}ms"
+    output = result.stdout or ""
+    note = ""
+    if result.sandbox == "host" and getattr(result, "fallback_reason", ""):
+        note = f"\n(sandbox unavailable — ran on host: {result.fallback_reason})"
+    if result.returncode != 0:
+        stderr = f"\nStderr: {result.stderr}" if result.stderr else ""
+        return f"Command failed (exit code {result.returncode}){output}{stderr}{note}"
+    return (output or "(no output)") + note
 
 
 def _web_fetch(inp: dict) -> str:

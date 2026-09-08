@@ -105,14 +105,15 @@ def _index_for(root: Path):
 
 # ─── grading ───────────────────────────────────────────────────
 
-def grade(root: Path) -> tuple[bool, int, int, str]:
+def grade(root: Path, *, sandbox=None) -> tuple[bool, int, int, str]:
     """Run the repo's own test suite for real. Returns
     (resolved, tests_passed, tests_total, summary_text).
 
     Counts are parsed from every test stage's stdout — fail-fast may
     stop the pipeline at targeted/unit before regression runs, and
-    those stages' pytest output still carries the counts."""
-    report = VerificationPipeline(root).run()
+    those stages' pytest output still carries the counts. ``sandbox``
+    routes the commands through the docker sandbox (Phase 12)."""
+    report = VerificationPipeline(root, sandbox=sandbox).run()
     resolved = report.passed
     passed = total = 0
     summary = ""

@@ -53,12 +53,19 @@ class VerificationPipeline:
                  tools: ToolDetection | None = None,
                  changed_files: list[str] | None = None,
                  target_tests: list[str] | None = None,
-                 reviewer: Callable[[VerificationReport], str] | None = None):
+                 reviewer: Callable[[VerificationReport], str] | None = None,
+                 sandbox: Any | None = None):
+        """``sandbox`` (a SandboxedCommandRunner) routes every stage
+        command through the docker sandbox — with the honest host-
+        fallback record when docker is unavailable. None keeps the
+        direct host subprocess (the pre-wiring behavior)."""
         self.root = Path(root).resolve()
         self.tools = tools or detect_tools(self.root)
         self.changed_files = [f for f in (changed_files or []) if f.strip()]
         self.target_tests = [t for t in (target_tests or []) if t.strip()]
         self.reviewer = reviewer
+        self.sandbox = sandbox
+        self._last_sandbox = ""
 
     # ─── file discovery ────────────────────────────────────────
 
@@ -104,6 +111,7 @@ class VerificationPipeline:
         report.selected_tools = self._selection_record()
         for stage in STAGE_ORDER:
             result = self._run_stage(stage, report)
+            result.sandbox = self._last_sandbox   # where the command really ran
             report.stages.append(result)
             if result.status == "failed":
                 break  # fail-fast: no further stages run
@@ -111,7 +119,7 @@ class VerificationPipeline:
 
     def _selection_record(self) -> dict[str, str]:
         t = self.tools
-        return {
+        record = {
             "python": t.python,
             "syntax": f"{Path(t.python).name} -m py_compile",
             "lint": t.lint_tool or "skipped: ruff/flake8/pyflakes not detected",
@@ -121,6 +129,9 @@ class VerificationPipeline:
                              if t.test_runner == "pytest" else "unittest <modules>",
             "reviewer": "callable hook" if self.reviewer else "skipped: no reviewer configured",
         }
+        if self.sandbox is not None:
+            record["sandbox"] = self.sandbox.label
+        return record
 
     def _run_stage(self, stage: str, report: VerificationReport) -> StageResult:
         if stage == "syntax":
@@ -292,6 +303,20 @@ class VerificationPipeline:
     # ─── helpers ───────────────────────────────────────────────
 
     def _run_cmd(self, argv: list[str]) -> subprocess.CompletedProcess:
+        if self.sandbox is not None:
+            result = self.sandbox.run(argv, cwd=self.root,
+                                      timeout_s=self.COMMAND_TIMEOUT)
+            # The honest record: where did this command really run?
+            if result.sandbox == "docker":
+                self._last_sandbox = "docker"
+            elif result.sandbox == "blocked":
+                self._last_sandbox = "blocked"
+            else:
+                self._last_sandbox = ("host"
+                                      + (f" ({result.fallback_reason})"
+                                         if result.fallback_reason else ""))
+            return result.as_completed_process()
+        self._last_sandbox = ""
         try:
             return subprocess.run(
                 argv, cwd=str(self.root), capture_output=True, text=True,

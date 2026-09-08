@@ -69,6 +69,9 @@ class StageResult:
     failed_tests: list[str] = field(default_factory=list)
     related_files: list[str] = field(default_factory=list)
     detail: str = ""                # skip reason / notes
+    sandbox: str = ""               # "" = no sandbox configured; else the
+                                    # honest record of where it ran:
+                                    # "docker" | "host (reason)" | "blocked"
 
     @property
     def failure(self) -> VerificationFailure | None:
