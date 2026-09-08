@@ -22,6 +22,7 @@ dependencies = [
 
 [project.scripts]
 mini-claude-py = "mini_claude.__main__:main"
+repopilot = "mini_claude.product.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["mini_claude*"]

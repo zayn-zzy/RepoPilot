@@ -5,7 +5,7 @@
 
 ## Project Status
 
-Current Phase: Phase 9（Evaluation + Benchmark）
+Current Phase: Phase 10（Productization）
 Overall Status: IN_PROGRESS
 Integration Branch: repopilot-dev
 Last Updated: 2026-09-07
@@ -22,6 +22,7 @@ Last Updated: 2026-09-07
 | 7 | Verification + Self-Repair | feat/phase-07-verification-repair | COMPLETED | 356/356 PASS | PASS |
 | 8 | Docker Sandbox + Security | feat/phase-08-sandbox-security | COMPLETED | 392/392 PASS | PASS |
 | 9 | Evaluation + Benchmark | feat/phase-09-evaluation | COMPLETED | 406/406 PASS | PASS |
+| 10 | Productization | feat/phase-10-productization | COMPLETED | 425/425 PASS | PASS |
 
 ---
 
@@ -2063,3 +2064,217 @@ Push：`origin/feat/phase-09-evaluation` → 合并 `repopilot-dev` → 集成
   `aggregate(runs) -> dict`。
 - 待后续集成：把 Proposed 的 TaskDAG 接上（Phase 4 Scheduler）后
   重跑对应消融；更大模板仓库扩展检索评估区分度。
+
+---
+
+## Phase 10：Productization（最终收尾）
+
+### 1. 开发目标
+
+按文档完成产品化收尾：`repopilot` CLI 七命令（init / index / ask /
+plan / run / graph / benchmark）；GitHub 流程（Issue 输入 → Issue →
+Requirement → RepoPilot Run → Patch → Commit → PR Description
+Generation → Pull Request），PR 至少含 Summary/Changes/Reason/Tests/
+Risk/Files Changed 六节；§24 Observability（每次 Agent Run 记录 Run/
+Task/Agent/LLM Request/Tool Call/Tool Result/Verification/Repair/
+Final Result + 全套指标，数据直接用于 Benchmark）；§25 README 如实
+更新（状态与代码一致、Benchmark 数字只来自真实原始数据）；§28 最终
+DoD 清单核对。FastAPI/Trace Viewer 为可选项，不因产品化拖延核心
+MVP——未实现（如实标注）。
+
+### 2. 实现内容
+
+新增 `mini_claude/product/` 包（4 模块，约 700 行）：
+
+- **RunLog（§24 可观测性）**：RunRecord 携带结构事件（llm_requests/
+  tool_calls/tool_results/verification/repair/final_result）+ §24 全套
+  指标（LLM calls、input/output/cached tokens、tool calls、tool
+  latency、runtime、estimated cost、files read/modified、tests
+  executed、repair attempts、task success/failure）；RunRecorder 挂在
+  runtime 事件流上（工具延迟 = 调用到结果的真实计时）；RunLogger 以
+  append-only JSONL 落盘（每 run 一行）——**与 Phase 9 评测消费的数据
+  同一形状**。
+- **GitHub 流（github.py）**：`issue_to_requirement`（Issue JSON →
+  Phase 4 Requirement，并在 parser 只认堆栈/FAILED 行之外补充正文
+  文件提及提取——issue 通常直接点名文件）；`build_pr_body` 恒产六节
+  （Summary/Changes/Reason/Tests/Risk/Files Changed），内容全部来自
+  真实 run 产物（任务 diff、reviewer 裁决、验证、修复）；gh 缺位时
+  显式报错并给出可直接执行的 `gh pr create` 命令——**绝不伪造**。
+- **编排器（orchestrator.py）**：`run_requirement` 串起全部 Phase：
+  WorktreeManager 建任务分支 → 五角色团队绑定 worktree → 真实验证
+  （Phase 9 grader）→ 失败则自修复（≤3 次）→ 清除验证产物 → diff →
+  提交 → 六节 PR 体 → 每角色一条 §24 RunLog。主工作区零写入
+  （.repopilot/ 本地 exclude）。
+- **CLI（cli.py）**：七命令全部可用；缺 git 仓库/缺 API key 都显式
+  报错；plan 默认确定性（无需 LLM），--llm 走真实规划器；run 输出
+  完整摘要 + PR 体路径 + gh 命令；benchmark 真实跑 24 任务 × 5 栈并
+  落原始数据。pyproject 增加 `repopilot` 脚本入口。
+
+### 3. 新增文件
+
+| 文件 | 作用 |
+|------|------|
+| `python/mini_claude/product/__init__.py` | 包导出 |
+| `python/mini_claude/product/runlog.py` | §24 RunRecord/RunRecorder/RunLogger |
+| `python/mini_claude/product/github.py` | issue→requirement / 六节 PR 体 / gh 集成 |
+| `python/mini_claude/product/orchestrator.py` | run_requirement 全链路编排 |
+| `python/mini_claude/product/cli.py` | repopilot CLI 七命令 |
+| `python/tests/product/test_runlog.py` | RunLog 测试（2 例） |
+| `python/tests/product/test_github.py` | GitHub 流测试（7 例） |
+| `python/tests/product/test_orchestrator.py` | E2E 编排测试（2 例） |
+| `python/tests/product/test_cli.py` | CLI 子进程测试（7 例） |
+
+### 4. 修改文件
+
+| 文件 | 修改 | 接口影响 |
+|------|------|----------|
+| `python/pyproject.toml` | 增加 `repopilot = mini_claude.product.cli:main` 入口 | 新增 |
+| `README.md` | 从上游教程内容重写为 RepoPilot 如实 README（§25） | 文档 |
+
+### 5. 核心设计
+
+```
+GitHub Issue ──► issue_to_requirement ──► repopilot run
+                                              │
+      run_requirement:  Worktree(task/XX) ─► TeamRunner(5 角色, worktree 绑定)
+                                              │  每角色 RunRecorder 挂事件流
+                         VerificationPipeline(真实测试) ◄─ 失败 ─ SelfRepair(≤3)
+                                              │
+                         清验证产物 ─► TaskDiff ─► Commit ─► PR 体(六节)
+                                              │
+                         RunLogger ─► .repopilot/runs.jsonl（每角色一行）
+                                              └──► gh pr create（gh 缺位则打印命令）
+```
+
+### 6. 测试
+
+新增 19 例（tests/product/，累计 425/425）：
+
+- **RunLog（2）**：脚本化 run 走真实记录路径——§24 结构事件与指标
+  全字段校验；JSONL 往返。
+- **GitHub 流（7）**：issue→Requirement（含正文文件提及提取）；六节
+  恒在且内容真实；无 reviewer 时如实不声称有裁决；gh 缺位显式报错
+  （fetch 与 create 两条路径）；mock gh 的成功路径。
+- **E2E 编排（2）**：脚本化五角色团队在**真实 git worktree** 里改
+  文件 → 真实验证 2/2 → 只提交源码变更（diff == ['calc.py']）→ 真实
+  commit → 六节 PR 体 → 5 条 RunLog 落盘 → 主工作区零污染；非 git 目
+  录如实报 worktree 失败。
+- **CLI（7）**：init（生成 config.json；非 git 拒绝）、index（真实
+  建库）、graph（真实边）、plan（确定性）、run 缺 key 显式失败、
+  benchmark（真实 120 行原始数据落盘）。
+
+### 7. 验证结果（真实验收）
+
+真实 CLI 验收（tmp 仓库 + 真实 LLM deepseek-v4-pro[1m] + 真实 git）：
+
+```text
+$ repopilot init
+repopilot initialized: /tmp/p10-accept/repo/.repopilot
+$ repopilot index
+indexed 2 files, 4 symbols, 2 imports (0.0s)
+$ repopilot graph
+modules: 2  edges: 1
+  tests.test_calc -> calc
+$ repopilot plan "multiply computes a+b instead of a*b — ..."
+requirement: ... (kind=bug)
+--- plan ---
+- T-B-1 [coder]: Fix the bug
+- T-B-2 [tester]: Add a regression test (deps: T-B-1)
+2 task(s)
+
+$ repopilot run "multiply() computes a+b instead of a*b — ..." --task-id ACCEPT2
+run ACCEPT2: SUCCESS
+  worktree: /tmp/p10-accept/repo/worktrees/task-ACCEPT2 (task/ACCEPT2)
+  roles run: ['planner', 'explorer', 'coder', 'tester', 'reviewer']
+  reviewer approved: True
+  verification: PASS 2/2 tests
+  files changed: ['calc.py']        ← 只有源码（验证产物已清除）
+  commit: c010fcf1f5c4
+  PR body: /tmp/p10-accept/repo/.repopilot/pr-ACCEPT2.md
+  create it with: gh pr create --head task/ACCEPT2 --base main ...
+```
+
+PR 体六节实录（截取）：Summary/Changes(`calc.py`)/Reason/Tests
+（Verification: PASS (2/2)）/Risk（reviewer 批准 + 真实建议"补
+multiply(0,5) 边界测试"）/Files Changed（base main | task/ACCEPT2 |
+Files: 1）。RunLog：5 条记录（五角色），reviewer 记录
+llm_calls=4、cost=$0.0136、tests=2、success=True。GitHub 流离线演示
+（本机无 gh）：issue JSON → Requirement（related_files 从正文提取
+pricing.py/order.py）→ 六节 PR 体全 True。
+
+单元测试：`425 passed`（406 旧 + 19 新，零回归）。
+
+### 8. Self-Repair
+
+1. **真实验收抓到 pycache 入补丁**：验证运行在 worktree 里生成
+   `__pycache__/*.pyc`，diff 收集与 `git add -A` 把它们全部卷进任务
+   提交（files changed 列表 7 个文件 5 个是 pyc）。修复：编排器在
+   diff/commit 前清除验证产物目录；E2E 测试固化为
+   `diff.all_files == ['calc.py']`。
+2. **TaskDAG 不是 list 是 dict**：CLI 打印 `plan.tasks` 按列表遍历
+   拿到 id 字符串。修复：dict/list 双形态处理，输出任务行。
+3. **plan 输出对象 repr**：json.dumps(default=str) 打出 TaskDAG 内存
+   地址。修复：任务行格式。
+4. **主工作区被 RunLog 污染**：`.repopilot/` 未跟踪目录让验收仓库
+   `git status` 变脏。修复：本地 .git/info/exclude（与 Phase 6
+   worktrees/ 同一纪律）。
+5. **run_requirement 漏 async**：async 函数内 await 却声明为 sync →
+   语法错误。修复：声明 async（CLI 用 asyncio.run 调用）。
+
+### 9. Git 信息
+
+Branch：`feat/phase-10-productization`（自 repopilot-dev 34ddf91 分叉）
+
+| Commit | 内容 |
+|--------|------|
+| 36b3012 | feat(product): observability RunLog — doc §24 records as JSONL |
+| 594550e | feat(product): GitHub issue→PR flow with the six-section PR body |
+| 4c149ae | feat(product): run_requirement composition and the repopilot CLI |
+| 355c740 | fix(product): purge verification artifacts from the task patch |
+| 85e6d57 | docs: rewrite README for RepoPilot with honest feature status |
+| （本文档） | docs(phase-10): record productization results and final DoD |
+| （待定） | feat(phase-10): merge productization into repopilot-dev |
+
+Push：`origin/feat/phase-10-productization` → 合并 `repopilot-dev` →
+集成回归（全量 425）→ Push `origin/repopilot-dev`。
+
+### 10. 全项目最终 DoD（§28 清单核对）
+
+| DoD 项 | 状态 | 证据 |
+|--------|------|------|
+| Agent Runtime / Tool Registry / Tool ACL | ✅ | Phase 1，runtime/ 包 + 59 测试 |
+| Repository Scanner / AST Parser / Symbol Index / Dependency Graph / Incremental Index | ✅ | Phase 2，repo/ 包 + SQLite 持久化 |
+| Lexical / Semantic / Structural Retrieval / Hybrid Ranker / Token-aware Context Builder | ✅ | Phase 3，retrieval/ 包 |
+| Requirement Parser / Planner / Task DAG / Scheduler | ✅ | Phase 4，planning/ 包 |
+| Explorer / Coder / Tester / Reviewer Agent | ✅ | Phase 5（+ Planner），agents/ 包 |
+| Git Worktree | ✅ | Phase 6，worktree/ 包 |
+| Verification Pipeline / Failure Parser / Self-Repair | ✅ | Phase 7，verify/ 包 + 真实修复演示 |
+| Persistence / Trace / Cost Metrics | ✅ | SQLite 索引持久化 + Phase 1 Trace + §24 RunLog（JSONL） |
+| Unit / Integration / End-to-End Tests | ✅ | 425/425；E2E = 脚本化 LLM 驱动真实循环 + 真实 worktree 链路 |
+| Retrieval / Agent Benchmark / Baseline Comparison / Ablation Study / Results | ✅ | Phase 9，原始数据落盘（120 检索行 + 14 代理 run） |
+| Complete README / DEVELOPMENT_RESULTS.md | ✅ | 本文档（Phase 0-10 全记录）+ README（§25 如实） |
+| Docker Sandbox 安全策略 | ✅（策略层）| Phase 8；Docker 实机路径本环境无 daemon，如实 UNVERIFIED |
+
+### 11. 已知问题
+
+- `gh` CLI 本环境不存在：PR 创建以"给出完整命令 + 落盘 body 文件"
+  收尾，未真实创建过 PR（无伪造）。
+- FastAPI / Trace Viewer 未实现（文档标注可选项，未为产品化拖延
+  MVP）。
+- ask/plan --llm 依赖环境变量 ANTHROPIC_API_KEY；缺 key 时 ask 退化为
+  纯检索上下文输出、plan 走确定性路径、run 显式失败。
+- 任务 id 默认取时间戳，长驻使用建议显式 --task-id。
+- Proposed 栈的 TaskDAG/记忆接线、Docker 实机验证是后续增强项（已在
+  各 Phase 记录）。
+
+### 12. 项目当前状态
+
+十个 Phase 全部 COMPLETED。`repopilot-dev` 为当前稳定开发版本，十个
+phase 分支 + main 均在 GitHub（见 §29 最终 Git 输出结构）。每个分支
+含代码、测试、Commit、Remote Branch、开发结果记录。
+
+- 已稳定产品接口：`repopilot` CLI 七命令；
+  `run_requirement(root, requirement, ...) -> RunReport`；
+  `RunLogger/RunRecorder`；`issue_to_requirement/build_pr_body`。
+- 后续增强（非阻塞）：TaskDAG 调度器接入 Proposed；Docker 实机冒烟；
+  更大模板仓库的检索评估；FastAPI/Trace Viewer。
