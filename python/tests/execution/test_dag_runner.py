@@ -398,6 +398,67 @@ class TestDagRunner(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(_git(self.repo, "status", "--porcelain"), "")
         self.assertFalse((self.repo / "newmod.py").exists())
 
+    # ─── sandbox wiring (Phase 12) ───────────────────────────
+
+    async def test_sandbox_routes_task_commands(self):
+        """With a docker-available sandbox (injected pass-through
+        executor), every verification command goes through the docker
+        argv and the report says so."""
+        from mini_claude.sandbox import SandboxedCommandRunner
+
+        def docker_executor(argv, **kwargs):
+            docker_executor.calls.append(argv)
+            cwd = None
+            for i, a in enumerate(argv):
+                if a == "--volume" and i + 1 < len(argv) and ":/workspace" in argv[i + 1]:
+                    cwd = Path(argv[i + 1].split(":")[0])
+                elif a == "-w" and i + 1 < len(argv):
+                    rel = argv[i + 1][len("/workspace"):].lstrip("/")
+                    if cwd is not None and rel:
+                        cwd = cwd / rel
+            return subprocess.run(argv[-1], shell=True, capture_output=True,
+                                  text=True, timeout=60,
+                                  cwd=str(cwd) if cwd is not None else None)
+        docker_executor.calls = []
+
+        def builder(path):
+            return SandboxedCommandRunner(path, mode="auto",
+                                          availability=lambda: True,
+                                          executor=docker_executor)
+
+        dag = TaskDAG([_node("T001", "add a file", "coder")])
+        router = _Router()
+        router.add("T001", _write_new_file("newmod.py", "N = 1\n"))
+        report = await _runner(self.repo, dag, after_build=router,
+                               sandbox="auto", sandbox_builder=builder).run("sb")
+
+        self.assertTrue(report.success, report.summarize())
+        self.assertIn("docker", report.sandbox)
+        # The verification commands (pytest argv) really went through
+        # the sandbox's docker argv, not a plain host subprocess.
+        self.assertTrue(docker_executor.calls)
+        self.assertTrue(any("pytest" in argv[-1] for argv in docker_executor.calls))
+        self.assertTrue(all(argv[0:2] == ["docker", "run"]
+                            for argv in docker_executor.calls))
+
+    async def test_sandbox_on_without_docker_fails_up_front(self):
+        dag = TaskDAG([_node("T001", "add a file", "coder")])
+        report = await _runner(self.repo, dag, sandbox="on").run("sb-on")
+        self.assertFalse(report.success)
+        self.assertIn("docker is unavailable", report.note)
+        self.assertIsNone(report.worktree)  # no worktree was ever created
+
+    async def test_sandbox_auto_reports_host_fallback(self):
+        """This environment has no docker: auto falls back to host for
+        real, the run still works, and the report says exactly that."""
+        dag = TaskDAG([_node("T001", "add a file", "coder")])
+        router = _Router()
+        router.add("T001", _write_new_file("newmod.py", "N = 1\n"))
+        report = await _runner(self.repo, dag, after_build=router,
+                               sandbox="auto").run("sb-auto")
+        self.assertTrue(report.success, report.summarize())
+        self.assertIn("host fallback", report.sandbox)
+
     async def test_no_commit_leaves_worktrees_dirty_but_runs(self):
         dag = TaskDAG([_node("T001", "add a file", "coder")])
         router = _Router()
