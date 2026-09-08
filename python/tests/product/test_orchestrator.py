@@ -169,7 +169,9 @@ class TestRunRequirement(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(report.verification["passed"])
             self.assertEqual(report.verification["tests_passed"],
                              report.verification["tests_total"])
-            self.assertEqual(report.diff.files, ["calc.py"])
+            # Only the source change enters the patch — verification
+            # artifacts (pycache) are purged before diff/commit.
+            self.assertEqual(report.diff.all_files, ["calc.py"])
             self.assertTrue(report.commit)
             self.assertIn("return a * b",
                           (report.worktree.path / "calc.py").read_text())

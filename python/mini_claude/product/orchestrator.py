@@ -160,7 +160,15 @@ async def run_requirement(root: str | Path, requirement: str | Requirement, *,
             report.verification = verification
     report.repair = repair
 
-    # Patch + commit + PR description.
+    # Patch + commit + PR description. Verification artifacts (pycache,
+    # pytest caches) are not source changes — purge them from the
+    # worktree before collecting the diff (they must never enter the
+    # task patch or the commit).
+    for cache in ("__pycache__", ".pytest_cache"):
+        for p in info.path.rglob(cache):
+            if p.is_dir():
+                import shutil
+                shutil.rmtree(p, ignore_errors=True)
     diff = manager.diff(task_id)
     report.diff = diff
     if commit and diff.all_files:

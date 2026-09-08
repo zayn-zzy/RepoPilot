@@ -189,8 +189,19 @@ def _cmd_plan(args) -> int:
         planner = Planner()
         plan = planner._deterministic_plan(requirement)
     print("--- plan ---")
-    print(json.dumps(plan.to_dict() if hasattr(plan, "to_dict") else plan,
-                     indent=2, ensure_ascii=False, default=str))
+    tasks = getattr(plan, "tasks", None)
+    if isinstance(tasks, dict):  # TaskDAG: id -> TaskNode
+        for t in tasks.values():
+            deps = f" (deps: {', '.join(t.dependencies)})" if t.dependencies else ""
+            print(f"- {t.id} [{t.agent_role}]: {t.title}{deps}")
+        print(f"{len(tasks)} task(s)")
+    elif tasks is not None:
+        for t in tasks:
+            deps = f" (deps: {', '.join(t.dependencies)})" if t.dependencies else ""
+            print(f"- {t.id} [{t.agent_role}]: {t.title}{deps}")
+        print(f"{len(tasks)} task(s)")
+    else:
+        print(json.dumps(plan, indent=2, ensure_ascii=False, default=str))
     return 0
 
 
