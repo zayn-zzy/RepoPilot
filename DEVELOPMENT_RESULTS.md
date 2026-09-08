@@ -2278,3 +2278,100 @@ phase 分支 + main 均在 GitHub（见 §29 最终 Git 输出结构）。每个
   `RunLogger/RunRecorder`；`issue_to_requirement/build_pr_body`。
 - 后续增强（非阻塞）：TaskDAG 调度器接入 Proposed；Docker 实机冒烟；
   更大模板仓库的检索评估；FastAPI/Trace Viewer。
+
+---
+
+## Phase 11：Task DAG 接入 run（execution 执行引擎）
+
+用户评审指出的首要差距："`repopilot run` 仍然直接执行固定五角色流水线，
+没有按照 DAG 创建多个任务、并行 worktree 或动态调度"。本 Phase 修复它。
+
+### 11.1 目标
+
+1. `repopilot run` 按 TaskDAG 执行：每任务一个独立 worktree + 一个角色 Agent；
+2. 并行：独立任务真实并行（`--jobs`），依赖任务按调度器动态派发；
+3. 依赖可见：下游任务基于上游已合并的集成状态分支；
+4. 合并冲突绝不强写（Phase 6 纪律），冲突任务如实失败并级联 BLOCKED；
+5. 每任务真实验证 + 有界自修复（Phase 7 复用），失败任务不进入集成结果。
+
+### 11.2 实现
+
+- 新增一级模块 `mini_claude/execution/`（runner.py，~500 行）：
+  `DagRunner` / `TaskOutcome` / `DagRunReport`。调度器线程复用
+  `planning.Scheduler`（max_attempts=0：任务级不重试，修复闭环是唯一
+  有界恢复），ThreadPoolExecutor(jobs) 并行执行 READY 任务。
+- 并行安全的基础改造（两处小改动，均为向后兼容）：
+  - `tools.py`：thread-local 工作根 `set_work_root()`。文件/shell 工具
+    （read/write/edit/list/grep/run_shell + execute_tool 的 read-before-edit
+    记账）按调用线程的根解析相对路径——否则并行线程共享进程 cwd 会互踩。
+    未设置时行为与原版完全一致。
+  - `worktree/manager.py`：`merge(task_id, target_branch, cwd=...)` ——
+    可在指定 checkout（集成 worktree）内合并；主工作区永不被切换/写入。
+- `orchestrator.run_dag_requirement()`：DagRunner 组合 + RunLogger（工厂
+  注入避免 execution→product 循环导入）+ PR 六节描述。
+- `cli.py`：`run --llm`（LLM 规划器）/ `--jobs`（默认 2）；默认确定性
+  规划器；`_make_llm_call`/`_print_plan` 与 plan 共用。
+- 执行语义：任务工作树验证失败 → 修复（≤3）→ 复验；仍失败 → 分支提交
+  留档但**不合并**（坏代码不进结果），任务 FAILED，下游级联 BLOCKED；
+  合并冲突 → 中止合并（集成 worktree 字节不变）、任务 conflict、运行失败。
+
+### 11.3 测试（21 个新增，全真实 git/worktree/pytest，仅 LLM 边界脚本化）
+
+| 文件 | 数量 | 覆盖 |
+|------|------|------|
+| tests/execution/test_dag_runner.py | 9 | 依赖可见（下游 worktree 含上游文件）、菱形 DAG 拓扑序、真实并行（wall-clock：jobs=2 比 jobs=1 快 ≥0.8s）、合并冲突中止且集成 worktree 不变、失败级联 BLOCKED 且坏代码不进集成、修复闭环 FAIL→PASS、非法计划在建 worktree 前拒绝、主工作区零触碰、--no-commit 语义 |
+| tests/execution/test_work_root.py | 9 | 根绑定读写/编辑/grep/list/shell-cwd、绝对路径直通、解除恢复、双线程同相对路径互不串扰、read-before-edit 记账随根 |
+| tests/worktree/test_manager.py 新增 | 3 | merge(cwd)：集成 worktree 内合并、冲突中止不动主区、cwd 分支不符拒绝 |
+
+```
+$ venv/bin/python -m pytest python/tests/ -q
+459 passed in 194.52s          # 438 + 21
+```
+
+### 11.4 真实验收（真实 LLM，命令与输出如实）
+
+确定性路径（无 --llm，任务号 T77610，小仓库 multiply bug）：
+
+```
+$ repopilot run "fix the multiply bug"
+（规划器产出 2 任务：T-B-1 coder 修复 → T-B-2 tester 补回归测试）
+run T77610: SUCCESS (2 task(s): succeeded=2)
+  - T-B-1 [coder] succeeded commit=97cdafa tests 1/1
+  - T-B-2 [tester] succeeded commit=da3b1db tests 2/2
+  final verification: PASS 2/2 tests
+  files changed: ['calc.py', 'tests/test_multiply.py']
+  集成 worktree 内 pytest 实跑：2 passed in 0.01s
+```
+
+LLM 规划器路径（--llm --jobs 2，任务号 T77001，中文需求）：
+
+```
+$ repopilot run --llm --jobs 2 --task-id T77001 "修复 multiply 函数：它计算 a+b 而不是 a*b"
+（LLM 规划器产出 4 任务链：T001 explorer → T002 coder → T003 tester → T004 reviewer）
+run T77001: SUCCESS (4 task(s): succeeded=4)
+  - T001 [explorer] succeeded commit=d387198 tests 1/1 repair=1x $0.0293
+  - T002 [coder]    succeeded tests 1/1 $0.0545
+  - T003 [tester]   succeeded commit=8adba02 tests 5/5 $0.0421
+  - T004 [reviewer] succeeded tests 5/5 $0.0521
+  final verification: PASS 5/5 tests
+  files changed: ['calc.py', 'tests/test_multiply.py']
+```
+
+如实注记：
+- T001 是只读 explorer，其任务 worktree 初始验证失败（基线仓库本来就带
+  一条失败测试），自修复引擎修好 multiply 后该修复被提交到 T001 分支并
+  合并——修复归属按"发生在哪个任务 worktree"如实记录。
+- 简单 bug 的 LLM 规划未产生并行分支（合理）；并行路径由测试用例的
+  wall-clock 断言与双任务合并用例覆盖。
+- 本次两 run 合计 ~$0.24 真实 API 花费；runlog 逐条落盘
+  `.repopilot/runs.jsonl`（llm_requests/tool_calls/verification/repair/
+  final_result 完整字段）。
+
+### 11.5 已知边界（如实）
+
+- 任务级不重试（Scheduler max_attempts=0）；恢复只走修复闭环——坏任务
+  的分支保留供人工检查，需显式 `WorktreeManager.cleanup` 清理。
+- `baselines.py` 的 -TaskDAG 消融注记已更新：Phase 9 基准数据按当时
+  TeamRunner 组合执行如实保存，不追溯改写；跨任务记忆仍未接入。
+- 代理循环的终端 UI 输出（🔍/✏️ 等）来自原始 agent loop，未在本 Phase
+  清理。
