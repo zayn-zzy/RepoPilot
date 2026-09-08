@@ -19,6 +19,7 @@ from mini_claude.evaluation import (  # noqa: E402
     grade,
     retrieval_eval,
 )
+from mini_claude.evaluation.harness import RETRIEVAL_CONFIGS  # noqa: E402
 from mini_claude.evaluation.tasks import apply_solution, build_task_repos  # noqa: E402
 
 
@@ -109,18 +110,17 @@ class TestRetrievalEval(unittest.TestCase):
 
     def test_real_retrieval_over_all_stacks(self):
         runs = retrieval_eval(self.tasks)
-        self.assertEqual(len(runs), 24 * 4)
+        self.assertEqual(len(runs), 24 * len(RETRIEVAL_CONFIGS))
         by_stack = {}
         for r in runs:
             self.assertIsNotNone(r.recall5)
             self.assertTrue(0.0 <= r.recall5 <= 1.0)
             self.assertTrue(0.0 <= r.mrr <= 1.0)
             by_stack.setdefault(r.baseline, []).append(r)
-        self.assertEqual(set(by_stack), {"grep", "semantic", "hybrid",
-                                         "hybrid+structural"})
+        self.assertEqual(set(by_stack), set(RETRIEVAL_CONFIGS))
         # The hybrid stacks find the calc-bug-multiply fix location: the
         # description names multiply() and calc.py holds it.
-        hybrid = {r.task_id: r for r in by_stack["hybrid+structural"]}
+        hybrid = {r.task_id: r for r in by_stack["hybrid+structural (Full)"]}
         self.assertGreater(hybrid["calc-bug-multiply"].mrr, 0.0)
         self.assertIn("calc.py", hybrid["calc-bug-multiply"].detail["ranked"][:5])
 

@@ -33,14 +33,18 @@ from .tasks import RepositoryTask
 # ─── retrieval evaluation ──────────────────────────────────────
 
 RETRIEVAL_CONFIGS = {
+    # Baseline A / B / C stacks plus the two retrieval ablations:
+    # "-Semantic" = lexical + structural (no semantic), "Full" = all three.
     "grep": dict(enable_lexical=False, enable_semantic=False,
                  enable_structural=False, rerank=False, grep=True),
     "semantic": dict(enable_lexical=False, enable_semantic=True,
                      enable_structural=False, rerank=False),
     "hybrid": dict(enable_lexical=True, enable_semantic=True,
                    enable_structural=False, rerank=True),
-    "hybrid+structural": dict(enable_lexical=True, enable_semantic=True,
-                              enable_structural=True, rerank=True),
+    "lexical+structural (-Semantic)": dict(enable_lexical=True, enable_semantic=False,
+                                           enable_structural=True, rerank=True),
+    "hybrid+structural (Full)": dict(enable_lexical=True, enable_semantic=True,
+                                     enable_structural=True, rerank=True),
 }
 
 
