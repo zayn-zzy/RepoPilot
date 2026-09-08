@@ -36,7 +36,10 @@ class SandboxPolicy:
     tmpfs_size: str = "256m"        # in-container /tmp scratch (disk bound)
     timeout_s: float = 300.0        # per-command wall clock
     network: str = "none"           # none | bridge | host
-    workspace: Path | None = None   # repo root, mounted read-only at /workspace
+    workspace: Path | None = None   # repo root, mounted at /workspace
+    workspace_writable: bool = False  # False = read-only mount (the doc's
+                                      # default); True = task worktrees that
+                                      # tests may write caches into
     writable: Path | None = None    # optional writable results dir (e.g. worktree)
     user: str = "1000:1000"         # run as unprivileged uid:gid, never root
     env_allowlist: frozenset[str] = field(default_factory=lambda: DEFAULT_ENV_ALLOWLIST)
