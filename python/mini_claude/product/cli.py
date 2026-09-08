@@ -219,18 +219,21 @@ def _cmd_plan(args) -> int:
         def make_llm_call(model: str):
             """The Planner's LLMCall contract: (system, user) -> text.
             Uses the Anthropic SDK pointed at the DeepSeek-compatible
-            endpoint (thinking must be disabled on SDK 1.4)."""
+            endpoint (thinking must be disabled on SDK 1.4), with the
+            net.py direct-connection fallback for broken proxies."""
             import anthropic
+            from ..net import anthropic_create_sync_with_fallback  # noqa: PLC0415
+            base_url = _llm_base_url()
             client = anthropic.Anthropic(
-                api_key=api_key,
-                base_url=_llm_base_url(),
-                timeout=120,
-            )
+                api_key=api_key, base_url=base_url, timeout=120)
+            direct_factory = lambda: anthropic.Anthropic(  # noqa: E731
+                api_key=api_key, base_url=base_url, timeout=120)
 
             async def llm_call(system: str, user: str) -> str:
                 import asyncio
                 response = await asyncio.to_thread(
-                    client.messages.create,
+                    anthropic_create_sync_with_fallback,
+                    client, direct_factory,
                     model=model,
                     max_tokens=2000,
                     thinking={"type": "disabled"},

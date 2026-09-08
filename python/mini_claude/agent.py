@@ -15,6 +15,11 @@ from typing import Any, Callable, Awaitable
 import anthropic
 import openai
 
+from .net import (  # noqa: E402
+    anthropic_create_with_fallback,
+    anthropic_stream_with_fallback,
+)
+
 from .tools import (
     tool_definitions,
     execute_tool,
@@ -321,6 +326,15 @@ class Agent:
                 kwargs["base_url"] = anthropic_base_url
             kwargs.update(_sdk_retries)
             self._anthropic_client = anthropic.AsyncAnthropic(**kwargs)
+            # Direct-connection fallback factory: a broken proxy is the
+            # most common real-world cause of "Connection error." — the
+            # call wrappers in net.py build this client INSIDE a
+            # proxy-variables-removed window (the vendored httpx2 bakes
+            # env proxies into its transport at construction time, so the
+            # client must be created proxy-free) and retry through it once.
+            _direct_kwargs = dict(kwargs)
+            self._anthropic_client_direct = (
+                lambda: anthropic.AsyncAnthropic(**_direct_kwargs))
             self._openai_client = None
 
     # ─── Prefix caching (Anthropic) ─────────────────────────────
@@ -381,9 +395,11 @@ class Agent:
         Code runs the classifier at temperature 0)."""
         if self._anthropic_client:
             client = self._anthropic_client
+            direct = self._anthropic_client_direct
             model = self.model
             async def _sq(system: str, user_message: str) -> str:
-                resp = await client.messages.create(
+                resp = await anthropic_create_with_fallback(
+                    client, direct,
                     model=model, max_tokens=256, system=system, temperature=0,
                     messages=[{"role": "user", "content": user_message}],
                 )
@@ -649,7 +665,8 @@ class Agent:
         a full messages array (that one is single-user-message, for memory
         recall)."""
         if self._anthropic_client:
-            resp = await self._anthropic_client.messages.create(
+            resp = await anthropic_create_with_fallback(
+                self._anthropic_client, self._anthropic_client_direct,
                 model=self.model, max_tokens=512, system=system, temperature=0, messages=messages,
             )
             return "".join(b.text for b in resp.content if b.type == "text")
@@ -667,7 +684,8 @@ class Agent:
         gate, stage 2 has room to think). temperature=0 for a deterministic
         verdict, matching Claude Code's classifier."""
         if self._anthropic_client:
-            resp = await self._anthropic_client.messages.create(
+            resp = await anthropic_create_with_fallback(
+                self._anthropic_client, self._anthropic_client_direct,
                 model=self.model, max_tokens=max_tokens, system=system, temperature=0,
                 messages=[{"role": "user", "content": user}],
             )
@@ -989,7 +1007,8 @@ class Agent:
         if len(self._anthropic_messages) < 4:
             return
         last_user_msg = self._anthropic_messages[-1]
-        summary_resp = await self._anthropic_client.messages.create(
+        summary_resp = await anthropic_create_with_fallback(
+            self._anthropic_client, self._anthropic_client_direct,
             model=self.model,
             max_tokens=2048,
             system="You are a conversation summarizer. Be concise but preserve important details.",
@@ -1679,7 +1698,9 @@ IMPORTANT: When your plan is complete, you MUST call exit_plan_mode. Do NOT ask 
             # Track in-flight tool_use blocks by index for streaming execution
             tool_blocks_by_index: dict[int, dict] = {}
 
-            async with self._anthropic_client.messages.stream(**create_params) as stream:
+            async with anthropic_stream_with_fallback(
+                    self._anthropic_client, self._anthropic_client_direct,
+                    **create_params) as stream:
                 async for event in stream:
                     if not hasattr(event, 'type'):
                         continue
