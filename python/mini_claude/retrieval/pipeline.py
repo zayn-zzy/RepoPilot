@@ -16,7 +16,7 @@ from .context import ContextBuilder
 from .fusion import Reranker, reciprocal_rank_fusion
 from .lexical import LexicalRetriever
 from .model import RetrievalHit
-from .semantic import SemanticRetriever
+from .semantic import NeuralSemanticRetriever
 from .structural import StructuralRetriever
 
 DEFAULT_WEIGHTS = {"lexical": 1.0, "semantic": 1.0, "structural": 0.6}
@@ -50,6 +50,10 @@ class HybridRetriever:
         max_hop: int = 2,
         weights: dict[str, float] | None = None,
         rerank: bool = True,
+        # Phase 14: the semantic stack's embedding backend (auto-detect
+        # by default: configured API → local fastembed → honest LSA).
+        semantic_backend=None,
+        semantic_cache=None,
     ):
         self.index = index
         self.files = files if files is not None else self._read_files(index)
@@ -58,10 +62,18 @@ class HybridRetriever:
         self.rerank_enabled = rerank
         self.analyzer = QueryAnalyzer()
         self.lexical = LexicalRetriever(self.files, symbol_index=index) if enable_lexical else None
-        self.semantic = SemanticRetriever(self.files) if enable_semantic else None
+        self.semantic = (NeuralSemanticRetriever(
+            self.files, backend=semantic_backend, cache_path=semantic_cache)
+            if enable_semantic else None)
         self.structural = StructuralRetriever(index) if enable_structural else None
         self.reranker = Reranker(self.files, index) if rerank else None
         self.context_builder = ContextBuilder(self.files, index)
+
+    @property
+    def semantic_label(self) -> str:
+        """What produced the semantic scores (neural model / LSA) —
+        surfaced to callers so results never pretend."""
+        return self.semantic.label if self.semantic is not None else "off"
 
     @staticmethod
     def _read_files(index) -> dict[str, str]:

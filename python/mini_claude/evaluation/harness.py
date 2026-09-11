@@ -58,8 +58,12 @@ def _repo_files(root: Path) -> dict[str, str]:
 
 
 def retrieval_eval(tasks: list[RepositoryTask],
-                   stacks: list[str] | None = None) -> list[TaskRunMetrics]:
-    """Real retrieval runs over every task; ground truth = relevant_files."""
+                   stacks: list[str] | None = None,
+                   semantic_backend=None,
+                   semantic_cache=None) -> list[TaskRunMetrics]:
+    """Real retrieval runs over every task; ground truth = relevant_files.
+    ``semantic_backend`` selects the Phase 14 embedding backend (default:
+    auto-detect); the chosen backend is recorded in every run's detail."""
     stacks = stacks or list(RETRIEVAL_CONFIGS)
     runs: list[TaskRunMetrics] = []
     for task in tasks:
@@ -67,6 +71,7 @@ def retrieval_eval(tasks: list[RepositoryTask],
         relevant = set(task.relevant_files)
         for stack in stacks:
             cfg = RETRIEVAL_CONFIGS[stack]
+            semantic_label = "off"
             if cfg.get("grep"):
                 ranked = [h.file_path for h in
                           grep_baseline(files, task.description, top_k=10)]
@@ -79,7 +84,10 @@ def retrieval_eval(tasks: list[RepositoryTask],
                     enable_semantic=cfg["enable_semantic"],
                     enable_structural=cfg["enable_structural"],
                     rerank=cfg["rerank"],
+                    semantic_backend=semantic_backend,
+                    semantic_cache=semantic_cache,
                 )
+                semantic_label = retriever.semantic_label
                 ranked = [h.file_path for h in
                           retriever.retrieve(task.description, top_k=10)]
             else:
@@ -91,7 +99,8 @@ def retrieval_eval(tasks: list[RepositoryTask],
                 recall10=recall_at_k(ranked, relevant, 10),
                 mrr=mrr(ranked, relevant),
                 topk_hit5=topk_hit(ranked, relevant, 5),
-                detail={"ranked": ranked, "relevant": sorted(relevant)},
+                detail={"ranked": ranked, "relevant": sorted(relevant),
+                        "semantic": semantic_label},
             ))
     return runs
 

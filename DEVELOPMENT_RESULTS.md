@@ -2558,3 +2558,88 @@ dependency_search pkg/core.py →
   F401（unused import）已最小化修复（语义不变，保留 import 边）。
 - 调用解析是 best-effort 的：参数绑定的调用（c.area()）、外部库（fmt.Println）
   如实进入 unresolved 集合，可查询。
+
+---
+
+## Phase 14：语义检索升级神经模型（embedding）
+
+用户评审差距 #4："'语义检索'不是神经向量模型。当前使用 TF-IDF + SVD 的
+LSA……缺点是理解同义表达的能力有限"。本 Phase 把语义检索升级为神经
+embedding，LSA 降为诚实标注的确定性回退。
+
+### 14.1 目标
+
+1. 语义检索默认使用神经 embedding 模型；2. 后端可插拔且**如实标注**
+（结果永远说明向量是谁产出的）；3. 向量缓存落盘，重复检索不再重复嵌入；
+4. 无网络/无依赖环境诚实降级 LSA（label 明确写 lsa，绝不冒充神经）。
+
+### 14.2 实现
+
+- 新增 `retrieval/embedding.py`：`EmbeddingBackend` 协议 + 三个实现：
+  - `FastembedBackend`：本地 ONNX 神经模型（默认 BAAI/bge-small-en-v1.5，
+    384 维；权重首次使用时从 HF Hub 下载并缓存）；
+  - `APIEmbeddingBackend`：任意 OpenAI 兼容 `/embeddings` 端点
+    （EMBEDDING_API_URL/KEY/MODEL，urllib 直连 + 代理移除窗口 + 显式错误）；
+  - `LSABackend`：原 TF-IDF+SVD，label=`lsa(Nd)`。
+  - `detect_embedding_backend(prefer)`：api → local(fastembed) → lsa，
+    永远返回选择原因（note 进入输出）。
+- `retrieval/semantic.py`：新增 `NeuralSemanticRetriever`（与
+  SemanticRetriever 同形：build 一次、search 多次、cosine 排序；
+  sources 带 `backend` label）；文档向量 JSON 缓存（backend label +
+  内容哈希键控，内容或后端变化自动失效）。原 SemanticRetriever 原样
+  保留。
+- `HybridRetriever(semantic_backend=, semantic_cache=)` + `semantic_label`
+  属性；`retrieval_eval` 透传后端并把 label 记入每条 run 的 detail。
+- CLI：`repopilot ask/benchmark --semantic {auto,local,api,lsa}`
+  （默认 auto）；ask 打印 `(semantic backend: ...)`；缓存写
+  `.repopilot/embeddings-cache.json`。
+- 基线语义栈（Baseline B）保持 LSA 构造不变；新跑 benchmark 的语义
+  run 会记录所选后端（数据随跑随记，不追溯改写 Phase 9 数据）。
+
+### 14.3 测试（+12，504/504）
+
+`tests/retrieval/test_neural.py`：cosine 排序与 label、空库、缓存写/读/
+复用（缓存命中时后端零调用）、内容变化缓存失效、LSA 后端与旧
+SemanticRetriever 排序一致、后端探测优先级（api 配置 → fastembed →
+诚实回退 note）、API 后端请求形状/归一化/404 显式错误（monkeypatch
+urllib）、HybridRetriever 融合 + label。test_pipeline 固定 LSA 后端
+（测试要确定性；产品默认 auto）。
+
+```
+$ venv/bin/python -m pytest python/tests/ -q
+504 passed in 374.37s        # 492 + 12
+```
+
+### 14.4 真实验收（真实模型，真实数字）
+
+```
+$ curl -X POST https://api.deepseek.com/embeddings（用户 key）
+  HTTP 401（带 key）/ 404（各模型名）→ DeepSeek 不提供 embedding API，如实记录
+$ venv/bin/pip install fastembed（成功；onnxruntime 等依赖）
+$ 首次 embed 下载 BAAI/bge-small-en-v1.5（HF Hub，~18s），dim=384
+
+真实仓库（/tmp/mltest，6 文件 4 语言）查询 "where is multiply called"：
+  neural (fastembed): utils/main.js 0.747 → utils/math.js 0.727 → app/types.ts 0.632
+  lsa   (100d):       utils/main.js 0.931 → utils/math.js 0.797 → pkg/core.py 0.018
+  # neural 第三名是语义相关的 types.ts；LSA 第三名是无关的 core.py（0.018 近乎零）
+  # ——神经模型的语义区分度差异可见。
+
+缓存：首次构建 1.8s（写入 57KB JSON）；第二次构建 0.00s（缓存命中，
+零嵌入调用），命中一致。
+
+$ repopilot ask --semantic local "multiply 函数在哪里被调用"
+  (semantic backend: neural(fastembed:BAAI/bge-small-en-v1.5) — local neural model (fastembed))
+  --- retrieved context ---  utils/math.js（定义方）第一
+```
+
+### 14.5 如实注记
+
+- 本 Phase 给 venv 新增了 fastembed/onnxruntime 等依赖（本地神经模型
+  所必需）；模型权重在首次使用时联网下载——测试不触发下载（fake
+  backend），真实验收才用真模型。
+- API 后端在本环境无法实测（DeepSeek 无 embeddings；无其他提供商
+  配置）——请求形状/错误路径有 monkeypatch 单测，实机路径如实
+  UNVERIFIED。
+- 大仓库注意：JSON 缓存为可读格式（1000 文件约 6MB）；向量缓存失效
+  基于全库内容哈希，单文件修改会整体重嵌（增量失效是后续优化项，
+  与 #6 索引 load() 复用同源）。

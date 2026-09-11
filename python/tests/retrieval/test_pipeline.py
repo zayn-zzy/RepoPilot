@@ -9,6 +9,7 @@ _PYTHON_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_PYTHON_DIR))
 
 from mini_claude.repo import RepositoryIndex  # noqa: E402
+from mini_claude.retrieval.embedding import LSABackend
 from mini_claude.retrieval import HybridRetriever, grep_baseline  # noqa: E402
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "repo_fixture"
@@ -37,7 +38,7 @@ class TestHybridPipeline(unittest.TestCase):
     def setUp(self):
         self.idx = RepositoryIndex(FIXTURE)
         self.idx.build()
-        self.hy = HybridRetriever(self.idx)
+        self.hy = HybridRetriever(self.idx, semantic_backend=LSABackend())
 
     def test_symbol_query_finds_defining_file(self):
         hits = self.hy.retrieve("where is the Processor class defined")
@@ -63,11 +64,13 @@ class TestHybridPipeline(unittest.TestCase):
 
     def test_modes_construct_all_benchmark_configs(self):
         # Semantic only (Baseline B)
-        semantic_only = HybridRetriever(self.idx, enable_lexical=False, enable_structural=False)
+        semantic_only = HybridRetriever(self.idx, enable_lexical=False, enable_structural=False,
+                                            semantic_backend=LSABackend())
         self.assertIsNotNone(semantic_only.semantic)
         self.assertIsNone(semantic_only.lexical)
         # Hybrid without graph (Baseline C)
-        no_graph = HybridRetriever(self.idx, enable_structural=False)
+        no_graph = HybridRetriever(self.idx, enable_structural=False,
+                                     semantic_backend=LSABackend())
         hits = no_graph.retrieve("User class")
         self.assertIn("pkg/models.py", [h.file_path for h in hits[:5]])
         # Full hybrid + graph (Proposed)
@@ -79,7 +82,7 @@ class TestHybridPipeline(unittest.TestCase):
         a = self.hy.retrieve("Processor")
         idx_b = RepositoryIndex(FIXTURE)
         idx_b.build()
-        b = HybridRetriever(idx_b).retrieve("Processor")
+        b = HybridRetriever(idx_b, semantic_backend=LSABackend()).retrieve("Processor")
         # separately built index — same content, same ranking
         self.assertEqual([h.file_path for h in a], [h.file_path for h in b])
 
