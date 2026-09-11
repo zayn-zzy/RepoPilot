@@ -2459,3 +2459,102 @@ run T88003: SUCCESS (2 task(s): succeeded=2)
   镜像可经 SandboxPolicy 配置。
 - 旧 `run_requirement`（TeamRunner 组合，Phase 10 遗留路径）未接沙箱；
   CLI 的 run 已走 DagRunner 路径。
+
+---
+
+## Phase 13：仓库理解多语言化 + 调用图/引用图
+
+用户评审差距 #3："Scanner 只接收 .py 文件；结构图是文件级 import 图，不是
+完整调用图、引用图，也不支持多语言仓库"。本 Phase 解决。
+
+### 13.1 目标
+
+1. 多语言扫描：Python + JavaScript/TypeScript(+TSX) 用 tree-sitter 真实解析；
+   java/c/cpp/go/rust/csharp/ruby/php 用 regex 回退解析器（如实标注
+   best-effort，绝不冒充）；
+2. 符号级引用提取（调用 + 属性访问）+ 跨文件解析，构成真正的调用图/引用图
+   （不再是文件级 import 图）；
+3. 索引持久化、检索与 Agent 工具（dependency_search）全面接上引用信息。
+
+### 13.2 实现
+
+- 新增 `repo/languages.py`：扩展名→语言映射、语言感知的模块命名
+  （`__init__.py`/`index.js` 包语义）、解析器工厂。
+- 新增 `repo/js_parser.py`（tree-sitter-javascript/-typescript，含 tsx）：
+  function/class/method/arrow 常量/interface，ES imports + `require()`
+  解构绑定（`const {a} = require('./m')` 绑定 a），调用 + 成员访问引用。
+- 新增 `repo/fallback_parser.py`（regex，best-effort）：8 语言的类/函数
+  定义（Go 按 receiver 类型判方法）、imports（Go 只认 `import` 语句，不误
+  抓 `return "ok"`）、调用引用；定义行不作为调用。
+- `repo/parser.py`（Python）扩展：call/attribute 引用提取（self.x 读取
+  不进引用边，self.method() 调用保留）。
+- `repo/symbols.py`：`SymbolKind.INTERFACE` + `Reference(caller,target,
+  kind,lineno)`；`ParsedModule.references`。
+- `repo/graph.py`：`ReferenceGraph`（符号级调用图：caller→target，
+  kind/count/两端文件；未解析目标如实保留）；`DependencyGraph.resolve_module`
+  公开化 + JS 相对路径（./x、../y）模块解析。
+- `repo/index.py`：按语言分发解析器；引用解析三级（同文件符号 → import
+  绑定（含 self/this 接收者作用域）→ 点号路径）；`callers_of/callees_of/
+  callers_of_file/callees_in_file/unresolved_references`；build 报告
+  files_by_language/parser_kinds。
+- `repo/store.py`：`symbol_refs` 表（"references" 是 SQLite 关键字）——
+  保存/加载五元组，旧库增量兼容。
+- `agents/tools.py`：dependency_search 输出"本文件调出/外部调进"真实调用
+  关系。
+- `cli.py`：`repopilot index` 输出 references 数与语言分布（含解析器类型）。
+
+### 13.3 测试（+11，492/492）
+
+`tests/repo/test_multilang.py`（11 个）：扩展名映射与模块命名、扫描 6 文件
+4 语言、JS require 绑定、TS interface/method/arrow、Go receiver 方法、
+Python/JS 跨文件调用解析（callers_of/callees_of/文件级聚合）、未解析引用
+如实保留（fmt.Println、参数绑定调用）、增量重建、引用经 SQLite 持久化往返。
+
+```
+$ venv/bin/python -m pytest python/tests/ -q
+492 passed in 324.05s        # 481 + 11
+```
+
+### 13.4 真实验收（真实命令与输出）
+
+```
+$ repopilot index        （/tmp/mltest：6 文件、4 语言的混合仓库）
+indexed 6 files, 14 symbols, 5 imports, 7 references (0.0s)
+  languages: go=1 [FallbackParser], javascript=2 [JsParser],
+             python=2 [PythonParser], typescript=1 [JsParser]
+
+$ repopilot graph
+modules: 7  edges: 3
+  pkg.service -> pkg.core
+  svc.handler -> fmt
+  utils.main -> utils.math
+
+$ repopilot ask "multiply 函数在哪里被调用"    （无 key，纯检索上下文）
+--- retrieved context ---
+### utils/main.js          （调用方，排第一）
+### utils/math.js          （定义方，排第二）
+### pkg/core.py / app/types.ts ...
+
+dependency_search utils/main.js →
+  calls out of this file (top targets): utils.math.add(1x), utils.math.multiply(1x)
+dependency_search pkg/core.py →
+  files calling into this file: pkg/core.py(1x), pkg/service.py(1x)
+```
+
+中文提问对英文代码符号的检索直接命中调用方/定义方（多语言文件均参与）。
+
+### 13.5 如实注记
+
+- regex 回退解析器是明确的最佳努力近似（签名=所在行、方法归属按
+  brace/receiver），解析器类型在 index 输出中标注，不冒充 tree-sitter
+  精度。
+- 环境变化记录：本机 venv 因本 Phase 安装了 tree-sitter-javascript /
+  tree-sitter-typescript，tree-sitter 核心升至 0.26.0（原有 python 语法
+  兼容，全量回归确认）。
+- 同期修复（环境暴露的真实问题，非本 Phase 引入）：探测与执行形态不一致
+  （detect_tools 用 PATH 二进制探测、管线却用 `python -m` 执行——anaconda
+  的 flake8/mypy 在 PATH 上而 venv 无对应模块）。现在模块探测优先、记录
+  命中形态、执行与探测同形态；相应测试断言改为兼容两态。fixtures 中真实
+  F401（unused import）已最小化修复（语义不变，保留 import 边）。
+- 调用解析是 best-effort 的：参数绑定的调用（c.area()）、外部库（fmt.Println）
+  如实进入 unresolved 集合，可查询。
