@@ -7,6 +7,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from .chinese import zh_method, tokenize_chinese
+
 _TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _PATH_RE = re.compile(r"[A-Za-z0-9_./-]+[.](?:py|md|json|toml)|[A-Za-z_][A-Za-z0-9_]*(?:[.][A-Za-z_][A-Za-z0-9_]*)+")
 _SNAKE_RE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
@@ -34,6 +36,7 @@ class AnalyzedQuery:
     symbol_hints: list[str] = field(default_factory=list)  # likely symbol names
     path_hints: list[str] = field(default_factory=list)    # file/module path-ish tokens
     kind_hint: str | None = None                           # class | function | method
+    zh_method: str = ""                                    # "jieba" | "bigram" | "" (no CJK)
 
 
 class QueryAnalyzer:
@@ -61,6 +64,14 @@ class QueryAnalyzer:
         for m in _PATH_RE.findall(raw):
             if m not in q.path_hints:
                 q.path_hints.append(m)
+
+        # Chinese terms (Phase 15): jieba words or CJK bigrams — a
+        # pure-Chinese query used to produce ZERO tokens and an empty
+        # retrieval; now its words join the lexical terms.
+        zh_tokens = tokenize_chinese(raw)
+        if zh_tokens:
+            q.zh_method = zh_method()
+            q.terms.extend(zh_tokens)
 
         # de-duplicate, keep order
         q.terms = list(dict.fromkeys(q.terms))
