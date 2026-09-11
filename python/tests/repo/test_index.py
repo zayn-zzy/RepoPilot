@@ -216,5 +216,130 @@ class TestPersistence(unittest.TestCase):
                 idx.save()
 
 
+class TestLoadOrBuild(unittest.TestCase):
+    """Phase 16 — load_or_build: the persisted index is actually reused
+    (load + incremental build), saved back when it changes, and seeded
+    into other checkouts of the same repo without ever writing back."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = copy_fixture(self._tmp.name)
+        self.db = Path(self._tmp.name) / "index.db"
+
+    def _edit(self, rel: str, text: str) -> None:
+        target = self.root / rel
+        with target.open("a") as f:
+            f.write(text)
+        st = target.stat()
+        os.utime(target, (st.st_atime, st.st_mtime + 10))
+
+    def test_fresh_build_saves_and_reports(self):
+        idx = RepositoryIndex(self.root)
+        result, note = idx.load_or_build(self.db)
+        self.assertTrue(self.db.is_file())
+        self.assertEqual(result.parsed_files, result.files)
+        self.assertIn("no saved index — built fresh", note)
+        idx.close()
+
+    def test_second_run_is_loaded_and_up_to_date(self):
+        idx = RepositoryIndex(self.root)
+        idx.load_or_build(self.db)
+        idx.close()
+        idx2 = RepositoryIndex(self.root)
+        result, note = idx2.load_or_build(self.db)
+        self.assertEqual(result.parsed_files, 0)
+        self.assertIn("loaded", note)
+        self.assertIn("up to date", note)
+        idx2.close()
+
+    def test_changed_file_is_reparsed_and_saved_back(self):
+        idx = RepositoryIndex(self.root)
+        first = idx.load_or_build(self.db)[0]
+        idx.close()
+        self._edit("top_level.py", "\ndef symbol_added_after_indexing():\n"
+                   "    return 42\n")
+        idx2 = RepositoryIndex(self.root)
+        result, note = idx2.load_or_build(self.db)
+        self.assertEqual(result.parsed_files, 1)
+        self.assertIn("re-parsed 1 changed file(s)", note)
+        self.assertIn("saved", note)
+        # the new symbol is visible immediately (the save-back persisted it)
+        self.assertTrue(idx2.find_symbol("symbol_added_after_indexing"))
+        self.assertNotEqual(first.symbols, result.symbols)
+        idx2.close()
+
+    def test_seeded_other_root_relocates_and_never_writes_back(self):
+        main = RepositoryIndex(self.root)
+        main.load_or_build(self.db)
+        main.close()
+        before = self.db.read_bytes()
+
+        other = Path(self._tmp.name) / "other"
+        shutil.copytree(self.root, other)
+        idx = RepositoryIndex(other)
+        result, note = idx.load_or_build(self.db, allow_other_root=True,
+                                         save_back=False)
+        self.assertEqual(result.parsed_files, 0)   # content identical
+        self.assertIn("seeded from", note)
+        self.assertIn("main repo index", note)
+        sym = idx.find_definition("pkg.models.User.greet")
+        self.assertIsNotNone(sym)
+        self.assertTrue(str(sym.location.file_path).startswith(str(other)))
+        self.assertEqual(self.db.read_bytes(), before)  # main db untouched
+        idx.close()
+
+    def test_seeded_index_is_never_saved_back_even_with_save_back(self):
+        main = RepositoryIndex(self.root)
+        main.load_or_build(self.db)
+        main.close()
+        before = self.db.read_bytes()
+        other = Path(self._tmp.name) / "other"
+        shutil.copytree(self.root, other)
+        idx = RepositoryIndex(other)
+        _, note = idx.load_or_build(self.db, allow_other_root=True,
+                                    save_back=True)   # must still refuse
+        self.assertIn("seeded from", note)
+        self.assertEqual(self.db.read_bytes(), before)
+        idx.close()
+
+    def test_foreign_db_is_replaced_with_an_honest_note(self):
+        # a db file that belongs to a DIFFERENT repo (not just another
+        # checkout) must not be loaded — it is rebuilt and replaced.
+        other_root = Path(self._tmp.name) / "otherrepo"
+        shutil.copytree(FIXTURE, other_root)
+        db2 = Path(self._tmp.name) / "foreign.db"
+        idx = RepositoryIndex(other_root)
+        idx.load_or_build(db2)
+        idx.close()
+        shutil.copy2(db2, self.db)
+        idx2 = RepositoryIndex(self.root)
+        _, note = idx2.load_or_build(self.db)
+        self.assertIn("replaced an index from a different root", note)
+        idx2.close()
+
+    def test_full_rebuild_ignores_saved_index(self):
+        idx = RepositoryIndex(self.root)
+        first = idx.load_or_build(self.db)[0]
+        idx.close()
+        idx2 = RepositoryIndex(self.root)
+        result, note = idx2.load_or_build(self.db, full=True)
+        self.assertEqual(result.parsed_files, result.files)  # everything re-parsed
+        self.assertIn("full rebuild", note)
+        self.assertEqual(result.symbols, first.symbols)
+        idx2.close()
+
+    def test_load_other_root_without_allow_is_refused(self):
+        main = RepositoryIndex(self.root)
+        main.load_or_build(self.db)
+        main.close()
+        other = Path(self._tmp.name) / "other"
+        shutil.copytree(self.root, other)
+        idx = RepositoryIndex(other)
+        self.assertFalse(idx.load(self.db))          # default: refuse
+        self.assertTrue(idx.load(self.db, allow_other_root=True))
+        idx.close()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
