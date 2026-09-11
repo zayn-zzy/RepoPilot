@@ -596,9 +596,9 @@ class DagRunner:
 
 
 def _purge_caches(path: Path) -> None:
-    """Verification artifacts (pycache, pytest caches) are not source
-    changes — purge them before diff/commit (the Phase 10 lesson)."""
-    for cache in ("__pycache__", ".pytest_cache"):
+    """Verification artifacts (pycache, pytest/mypy caches) are not
+    source changes — purge them before diff/commit (the Phase 10 lesson)."""
+    for cache in ("__pycache__", ".pytest_cache", ".mypy_cache"):
         for p in Path(path).rglob(cache):
             if p.is_dir():
                 shutil.rmtree(p, ignore_errors=True)

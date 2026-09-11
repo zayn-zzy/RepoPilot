@@ -41,7 +41,7 @@ def _make_repo(tmp: Path) -> Path:
     _git(repo, "config", "user.name", "dev")
     (repo / "calc.py").write_text(CALC)
     (repo / "stats.py").write_text("from calc import add\n\n\ndef total(xs):\n"
-                                   "    return sum(xs)\n")
+                                   "    return add(sum(xs), 0)\n")
     (repo / "tests").mkdir()
     (repo / "tests" / "test_calc.py").write_text(
         "from calc import add\n\n\ndef test_add():\n    assert add(1, 2) == 3\n")

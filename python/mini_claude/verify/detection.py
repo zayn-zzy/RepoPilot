@@ -40,6 +40,8 @@ class ToolDetection:
     test_runner: str | None            # "pytest" | "unittest" | None
     lint_tool: str | None              # "ruff" | "flake8" | "pyflakes" | None
     type_tool: str | None              # "mypy" | "pyright" | None
+    lint_module: bool = False          # detected via `python -m` (else PATH binary)
+    type_module: bool = False          # detected via `python -m` (else PATH binary)
     probe_log: dict[str, str] = field(default_factory=dict)  # tool → real outcome
 
 
@@ -61,29 +63,41 @@ def detect_tools(root: str | Path, *, python: str | None = None,
             test_runner = "unittest"
             log["unittest"] = "detected (stdlib fallback)"
 
+    # The MODULE form is probed first: the stage commands run with
+    # `python -m <tool>` — a PATH binary from another environment (e.g.
+    # a conda mypy next to a venv python) would probe green but fail at
+    # run time. When only the binary exists, the recorded argv form says
+    # so and the stage runs the binary as-is.
     lint_tool = None
-    for name, argv in (("ruff", ["ruff", "--version"]),
-                       ("ruff-module", [python, "-m", "ruff", "--version"]),
-                       ("flake8", ["flake8", "--version"]),
-                       ("pyflakes", ["pyflakes", "--version"])):
+    lint_module = False
+    for name, argv, module in (("ruff-module", [python, "-m", "ruff", "--version"], True),
+                               ("ruff", ["ruff", "--version"], False),
+                               ("flake8-module", [python, "-m", "flake8", "--version"], True),
+                               ("flake8", ["flake8", "--version"], False),
+                               ("pyflakes", ["pyflakes", "--version"], False)):
         ok = probe(argv).returncode == 0
         log[name] = "detected" if ok else "not detected"
         if ok and lint_tool is None:
-            lint_tool = name.split("-")[0] if name.startswith("ruff") else name
+            lint_tool = name.split("-")[0]
+            lint_module = module
 
     type_tool = None
-    for name, argv in (("mypy", ["mypy", "--version"]),
-                       ("mypy-module", [python, "-m", "mypy", "--version"]),
-                       ("pyright", ["pyright", "--version"])):
+    type_module = False
+    for name, argv, module in (("mypy-module", [python, "-m", "mypy", "--version"], True),
+                               ("mypy", ["mypy", "--version"], False),
+                               ("pyright", ["pyright", "--version"], False)):
         ok = probe(argv).returncode == 0
         log[name] = "detected" if ok else "not detected"
         if ok and type_tool is None:
             type_tool = "mypy" if name.startswith("mypy") else name
+            type_module = module
 
     return ToolDetection(
         python=python,
         test_runner=test_runner,
         lint_tool=lint_tool,
         type_tool=type_tool,
+        lint_module=lint_module,
+        type_module=type_module,
         probe_log=log,
     )

@@ -29,7 +29,7 @@ def _make_repo(tmp: Path) -> Path:
         "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n"
         "    return a + b\n")  # buggy but irrelevant for these commands
     (repo / "stats.py").write_text("from calc import add\n\n\ndef total(xs):\n"
-                                   "    return sum(xs)\n")
+                                   "    return add(sum(xs), 0)\n")
     (repo / "tests").mkdir()
     (repo / "tests" / "test_calc.py").write_text(
         "from calc import add\n\n\ndef test_add():\n    assert add(1, 2) == 3\n")
