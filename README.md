@@ -17,7 +17,7 @@ Runtime、仓库智能、混合检索、任务规划、多代理团队、Git Wor
 |------|------|------|
 | Agent Runtime（配置/注册表/ACL/预算/上下文/事件+Trace） | ✅ | `mini_claude/runtime/` |
 | Repository Intelligence（多语言扫描/AST/符号索引/依赖图+调用引用图/增量 SQLite 持久化） | ✅ Python+JS/TS(TSX) 经 tree-sitter 解析，java/c/cpp/go/rust/csharp/ruby/php 经 regex 回退（如实标注）；跨文件调用图/引用图 | `mini_claude/repo/` |
-| Hybrid Retrieval（词法 BM25/语义神经 embedding/结构图/融合重排/上下文构建） | ✅ 语义栈默认真实神经模型（本地 fastembed bge-small，可配 API），LSA 为诚实标注的确定性回退；向量缓存落盘 | `mini_claude/retrieval/` |
+| Hybrid Retrieval（词法 BM25/语义神经 embedding/结构图/融合重排/上下文构建） | ✅ 语义栈默认真实神经模型（本地 fastembed bge-small，可配 API），LSA 为诚实标注的确定性回退；向量缓存落盘；中文分词（jieba/bigram 降级，如实标注）接入全部检索路径 | `mini_claude/retrieval/` |
 | Requirement + Task DAG（解析/七状态机/拓扑调度/重试） | ✅ | `mini_claude/planning/` |
 | Multi-Agent（Planner/Explorer/Coder/Tester/Reviewer + Artifact 邮箱） | ✅ | `mini_claude/agents/` |
 | Git Worktree Isolation（任务分支/独立工作目录/冲突零覆盖/安全清理） | ✅ | `mini_claude/worktree/` |
@@ -69,7 +69,7 @@ Changed）。GitHub PR 创建通过 `gh` CLI（未安装时给出可直接执行
 ## 测试
 
 ```bash
-python -m pytest python/tests/ -q      # 当前 504/504
+python -m pytest python/tests/ -q      # 当前 516/516
 ```
 
 覆盖：单元/集成/E2E（E2E = 脚本化 LLM 驱动真实 Agent 循环走完整
