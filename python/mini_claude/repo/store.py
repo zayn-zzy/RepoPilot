@@ -1,9 +1,12 @@
-"""SQLite persistence — file records, symbols, and imports, plus index
-metadata. One database per repository index (default: <root>/.repopilot/
-index.db is chosen by RepositoryIndex; this class is db-path agnostic).
+"""SQLite persistence — file records, symbols, imports and references,
+plus index metadata. One database per repository index (default:
+<root>/.repopilot/index.db is chosen by RepositoryIndex; this class is
+db-path agnostic).
 
-Symbol/Import locations are stored repo-relative so the database survives a
-repo move; load() joins them back onto the saved root path."""
+Symbol/Import/Reference locations are stored repo-relative so the database
+survives a repo move; load() joins them back onto the saved root path.
+The symbol_refs table (Phase 13; "references" is an SQLite keyword) is
+additive: older databases without it gain the empty table on open."""
 
 from __future__ import annotations
 
@@ -11,7 +14,7 @@ import os
 import sqlite3
 from pathlib import Path
 
-from .symbols import FileRecord, ImportInfo, Location, Symbol, SymbolKind
+from .symbols import FileRecord, ImportInfo, Location, Reference, Symbol, SymbolKind
 
 SCHEMA_VERSION = "1"
 
@@ -48,11 +51,20 @@ CREATE TABLE IF NOT EXISTS imports (
     level     INTEGER NOT NULL DEFAULT 0,
     lineno    INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS symbol_refs (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_path TEXT NOT NULL,
+    caller    TEXT NOT NULL DEFAULT '',
+    target    TEXT NOT NULL,
+    kind      TEXT NOT NULL DEFAULT 'call',
+    lineno    INTEGER NOT NULL DEFAULT 0
+);
 CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name, kind);
 CREATE INDEX IF NOT EXISTS idx_symbols_qname ON symbols(qualified_name);
 CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols(file_path);
 CREATE INDEX IF NOT EXISTS idx_imports_file ON imports(file_path);
 CREATE INDEX IF NOT EXISTS idx_imports_module ON imports(module);
+CREATE INDEX IF NOT EXISTS idx_references_file ON symbol_refs(file_path);
 """
 
 
@@ -70,13 +82,15 @@ class SQLiteStore:
     # ─── Write ───────────────────────────────────────────────
 
     def save(self, root_path: str, files: dict[str, FileRecord],
-             symbols: dict[str, list[Symbol]], imports: dict[str, list[ImportInfo]]) -> None:
+             symbols: dict[str, list[Symbol]], imports: dict[str, list[ImportInfo]],
+             references: dict[str, list[Reference]] | None = None) -> None:
         """Replace the whole index content (single transaction)."""
         with self._conn:
             self._conn.execute("DELETE FROM meta")
             self._conn.execute("DELETE FROM files")
             self._conn.execute("DELETE FROM symbols")
             self._conn.execute("DELETE FROM imports")
+            self._conn.execute("DELETE FROM symbol_refs")
             self._conn.executemany(
                 "INSERT INTO meta(key, value) VALUES (?, ?)",
                 [("schema_version", SCHEMA_VERSION), ("root_path", root_path)],
@@ -111,10 +125,20 @@ class SQLiteStore:
                         for i in imps
                     ],
                 )
+            for path, refs in (references or {}).items():
+                self._conn.executemany(
+                    "INSERT INTO symbol_refs(file_path, caller, target, kind, lineno)"
+                    " VALUES (?, ?, ?, ?, ?)",
+                    [
+                        (os.path.relpath(r.file_path, root_path), r.caller,
+                         r.target, r.kind, r.lineno)
+                        for r in refs
+                    ],
+                )
 
     # ─── Read ────────────────────────────────────────────────
 
-    def load(self) -> tuple[str, dict[str, FileRecord], dict[str, list[Symbol]], dict[str, list[ImportInfo]]] | None:
+    def load(self) -> tuple[str, dict[str, FileRecord], dict[str, list[Symbol]], dict[str, list[ImportInfo]], dict[str, list[Reference]]] | None:
         """Restore the persisted index, or None when the db has no data."""
         try:
             root = self._conn.execute(
@@ -158,4 +182,14 @@ class SQLiteStore:
                 file_path=abs_path, module=module, symbol=symbol, alias=alias,
                 level=level, lineno=lineno,
             ))
-        return root_path, files, symbols, imports
+        references: dict[str, list[Reference]] = {}
+        for row in self._conn.execute(
+            "SELECT file_path, caller, target, kind, lineno FROM symbol_refs ORDER BY id"
+        ):
+            path, caller, target, kind, lineno = row
+            abs_path = os.path.join(root_path, path)
+            references.setdefault(path, []).append(Reference(
+                file_path=abs_path, caller=caller, target=target, kind=kind,
+                lineno=lineno,
+            ))
+        return root_path, files, symbols, imports, references

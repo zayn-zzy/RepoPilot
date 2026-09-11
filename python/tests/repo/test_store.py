@@ -13,6 +13,7 @@ from mini_claude.repo.symbols import (  # noqa: E402
     FileRecord,
     ImportInfo,
     Location,
+    Reference,
     Symbol,
 )
 
@@ -46,16 +47,23 @@ def _sample_state():
         ],
         "broken.py": [],
     }
-    return files, symbols, imports
+    references = {
+        "pkg/mod.py": [
+            Reference(abs_mod, "pkg.mod.run", "utils.add", "call", lineno=2),
+            Reference(abs_mod, "pkg.mod.run", "os.path.join", "attribute", lineno=3),
+        ],
+        "broken.py": [],
+    }
+    return files, symbols, imports, references
 
 
 class TestStoreRoundtrip(unittest.TestCase):
     def test_save_load(self):
-        files, symbols, imports = _sample_state()
+        files, symbols, imports, references = _sample_state()
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "idx.db"
             store = SQLiteStore(db)
-            store.save("/repo/root", files, symbols, imports)
+            store.save("/repo/root", files, symbols, imports, references)
             store.close()
 
             store = SQLiteStore(db)
@@ -63,7 +71,7 @@ class TestStoreRoundtrip(unittest.TestCase):
             store.close()
 
         self.assertIsNotNone(loaded)
-        root, l_files, l_symbols, l_imports = loaded
+        root, l_files, l_symbols, l_imports, l_refs = loaded
         self.assertEqual(root, "/repo/root")
         self.assertEqual(set(l_files), set(files))
         self.assertEqual(l_files["broken.py"].has_syntax_error, True)
@@ -73,6 +81,13 @@ class TestStoreRoundtrip(unittest.TestCase):
         self.assertEqual(len(syms), 2)
         self.assertEqual(syms[0].name, "run")
         self.assertEqual(syms[0].kind, SymbolKind.FUNCTION)
+        # References roundtrip too (Phase 13): relative on disk, absolute
+        # file paths back in memory.
+        refs = l_refs["pkg/mod.py"]
+        self.assertEqual([(r.caller, r.target, r.kind, r.lineno) for r in refs],
+                         [("pkg.mod.run", "utils.add", "call", 2),
+                          ("pkg.mod.run", "os.path.join", "attribute", 3)])
+        self.assertEqual(refs[0].file_path, f"{ROOT}/pkg/mod.py")
         self.assertEqual(syms[0].qualified_name, "pkg.mod.run")
         self.assertEqual(syms[0].docstring, "Doc here.")
         self.assertEqual((syms[0].location.start_line, syms[0].location.end_line), (1, 3))
@@ -92,17 +107,18 @@ class TestStoreRoundtrip(unittest.TestCase):
             store.close()
 
     def test_save_overwrites_previous(self):
-        files, symbols, imports = _sample_state()
+        files, symbols, imports, references = _sample_state()
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "idx.db"
             store = SQLiteStore(db)
-            store.save("/r", files, symbols, imports)
-            store.save("/r", {}, {}, {})   # replace with empty state
+            store.save("/r", files, symbols, imports, references)
+            store.save("/r", {}, {}, {}, {})   # replace with empty state
             loaded = store.load()
             store.close()
             self.assertEqual(loaded[1], {})
             self.assertEqual(loaded[2], {})
             self.assertEqual(loaded[3], {})
+            self.assertEqual(loaded[4], {})
 
 
 if __name__ == "__main__":

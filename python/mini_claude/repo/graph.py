@@ -46,7 +46,7 @@ class DependencyGraph:
         when possible; returns the resolved file path (None if unresolvable).
         External modules (stdlib/third-party) become module nodes without a
         file — still visible in module_dependencies()."""
-        target_module = self._resolve_module_name(from_file, imp)
+        target_module = self.resolve_module(from_file, imp)
         if target_module is None:
             return None
 
@@ -64,10 +64,20 @@ class DependencyGraph:
             return target_file
         return None
 
-    def _resolve_module_name(self, from_file: str, imp: ImportInfo) -> str | None:
+    def resolve_module(self, from_file: str, imp: ImportInfo) -> str | None:
+        """Resolve an ImportInfo to a module name (public — the index
+        reuses it for reference resolution). Python-relative imports
+        resolve against the importer's package; JS-style relative
+        specifiers ('./x', '../y') are normalized to their dotted
+        equivalent; bare names pass through."""
         if imp.level == 0:
+            if imp.module.startswith("./") or imp.module.startswith("../"):
+                return self._resolve_js_specifier(from_file, imp.module)
             return imp.module or None
-        # Relative: Python resolves `from .X` against the file's PACKAGE,
+        return self._resolve_python_relative(from_file, imp)
+
+    def _resolve_python_relative(self, from_file: str, imp: ImportInfo) -> str | None:
+        # Python resolves `from .X` against the file's PACKAGE,
         # stepping up one level per extra dot. For an __init__.py the module
         # name IS the package; for pkg/sub/helper.py the package is pkg.sub.
         base = self._file_to_module.get(from_file)
@@ -85,6 +95,28 @@ class DependencyGraph:
         if imp.module:
             parts = parts + imp.module.split(".")
         return ".".join(parts)
+
+    # Backward-compatible alias (the pre-Phase-13 private name).
+    def _resolve_module_name(self, from_file: str, imp: ImportInfo) -> str | None:
+        return self.resolve_module(from_file, imp)
+
+    def _resolve_js_specifier(self, from_file: str, specifier: str) -> str | None:
+        # './x' → the importer's directory + x; '../y' steps up. Extension
+        # and index files are the file-resolution layer's concern — this
+        # returns the normalized dotted module path only.
+        base = self._file_to_module.get(from_file)
+        if not base:
+            return None
+        dir_parts = base.split(".")[:-1]
+        parts = specifier.split("/")
+        ups = 0
+        while parts and parts[0] in (".", ".."):
+            if parts[0] == "..":
+                ups += 1
+            parts = parts[1:]
+        if ups >= len(dir_parts):
+            return None
+        return ".".join(dir_parts[:len(dir_parts) - ups] + parts)
 
     # ─── Queries ─────────────────────────────────────────────
 
@@ -143,3 +175,83 @@ class DependencyGraph:
     def closure(self, file_path: str) -> list[str]:
         """All files reachable from this file (transitive imports), sorted."""
         return sorted(nx.descendants(self._file_graph, file_path)) if file_path in self._file_graph else []
+
+
+class ReferenceGraph:
+    """Symbol-level call/reference graph — the complement of the file-level
+    import graph: edges run caller → target, where callers are qualified
+    symbol names and targets are either resolved qualified names or the
+    unresolved name as written (kept honestly, marked).
+
+    Edge attributes: kind ("call" | "attribute"), count (aggregated
+    duplicates), caller_file / target_file (for file-level aggregation).
+    """
+
+    def __init__(self) -> None:
+        self._graph = nx.DiGraph()
+        self._unresolved: set[str] = set()
+
+    def add_reference(self, ref, resolved_target: str | None,
+                      target_file: str | None) -> None:
+        caller = ref.caller or ref.file_path   # module-level code
+        target = resolved_target or ref.target
+        if resolved_target is None:
+            self._unresolved.add(ref.target)
+        if not caller or not target:
+            return
+        if self._graph.has_edge(caller, target):
+            self._graph[caller][target]["count"] += 1
+            return
+        self._graph.add_edge(
+            caller, target, kind=ref.kind, count=1,
+            caller_file=ref.file_path, target_file=target_file or "",
+        )
+
+    # ─── Queries ─────────────────────────────────────────────
+
+    def callers_of(self, qualified_name: str) -> list[tuple[str, str, int]]:
+        """(caller, kind, count) for every symbol that references this one."""
+        if qualified_name not in self._graph:
+            return []
+        return sorted(
+            (u, d["kind"], d["count"])
+            for u, d in self._graph.pred[qualified_name].items())
+
+    def callees_of(self, qualified_name: str) -> list[tuple[str, str, int]]:
+        """(target, kind, count) for everything this symbol references."""
+        if qualified_name not in self._graph:
+            return []
+        return sorted(
+            (v, d["kind"], d["count"])
+            for v, d in self._graph.succ[qualified_name].items())
+
+    def unresolved(self) -> list[str]:
+        """Reference targets that could not be resolved to a known symbol."""
+        return sorted(self._unresolved)
+
+    def callers_of_file(self, file_path: str) -> list[tuple[str, int]]:
+        """(caller_file, count) aggregated over every reference whose
+        target lives in this file."""
+        out: dict[str, int] = {}
+        for _u, _v, d in self._graph.edges(data=True):
+            if d.get("target_file") == file_path:
+                out[d["caller_file"]] = out.get(d["caller_file"], 0) + d["count"]
+        return sorted(out.items(), key=lambda kv: -kv[1])
+
+    def callees_in_file(self, file_path: str) -> list[tuple[str, int]]:
+        """(target, count) aggregated over references originating in this
+        file — resolved qualified names and unresolved names alike."""
+        out: dict[str, int] = {}
+        for _u, v, d in self._graph.edges(data=True):
+            if d.get("caller_file") == file_path:
+                out[v] = out.get(v, 0) + d["count"]
+        return sorted(out.items(), key=lambda kv: -kv[1])
+
+    def nodes(self) -> list[str]:
+        return sorted(self._graph.nodes)
+
+    def edges(self) -> list[tuple[str, str, str, int]]:
+        """(caller, target, kind, count)."""
+        return sorted(
+            (u, v, d["kind"], d["count"])
+            for u, v, d in self._graph.edges(data=True))
