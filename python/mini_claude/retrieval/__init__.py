@@ -8,7 +8,8 @@ from .fusion import Reranker, reciprocal_rank_fusion, weighted_fusion
 from .lexical import LexicalRetriever
 from .model import RetrievalHit
 from .pipeline import HybridRetriever, grep_baseline
-from .semantic import SemanticRetriever
+from .embedding import detect_embedding_backend
+from .semantic import NeuralSemanticRetriever, SemanticRetriever
 from .structural import StructuralRetriever
 
 __all__ = [
@@ -20,6 +21,8 @@ __all__ = [
     "Reranker",
     "RetrievalHit",
     "SemanticRetriever",
+    "NeuralSemanticRetriever",
+    "detect_embedding_backend",
     "StructuralRetriever",
     "estimate_tokens",
     "grep_baseline",

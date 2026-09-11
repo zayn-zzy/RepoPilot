@@ -79,6 +79,10 @@ def main(argv: list[str] | None = None) -> int:
     p_ask.add_argument("question", help="the question about this repository")
     p_ask.add_argument("--dir", default=".", help="repository root")
     p_ask.add_argument("--model", default="deepseek-v4-pro[1m]")
+    p_ask.add_argument("--semantic", choices=("auto", "local", "api", "lsa"),
+                       default="auto",
+                       help="semantic embedding backend (default auto: "
+                            "API config → local fastembed → LSA fallback)")
 
     p_plan = sub.add_parser("plan", help="parse a requirement and produce a plan")
     p_plan.add_argument("requirement", help="natural-language requirement")
@@ -112,6 +116,10 @@ def main(argv: list[str] | None = None) -> int:
     p_bench = sub.add_parser("benchmark", help="run the Phase 9 evaluation")
     p_bench.add_argument("--out", default=None,
                          help="directory for raw results (default: under .repopilot)")
+    p_bench.add_argument("--semantic", choices=("auto", "local", "api", "lsa"),
+                         default="auto",
+                         help="semantic embedding backend for the retrieval runs "
+                              "(recorded per run; default auto)")
 
     args = parser.parse_args(argv)
     try:
@@ -190,12 +198,16 @@ def _cmd_index(args) -> int:
 
 
 def _cmd_ask(args) -> int:
-    from ..retrieval import HybridRetriever
+    from ..retrieval import HybridRetriever, detect_embedding_backend
     from ..repo import RepositoryIndex
     root = Path(args.dir).resolve()
     index = RepositoryIndex(root)
     index.build()
-    retriever = HybridRetriever(index)
+    backend, note = detect_embedding_backend(prefer=args.semantic)
+    cache = _repopilot_dir(root) / "embeddings-cache.json"
+    retriever = HybridRetriever(index, semantic_backend=backend,
+                                semantic_cache=cache)
+    print(f"(semantic backend: {retriever.semantic_label} — {note})")
     context = retriever.build_context(args.question, token_budget=3000, top_k=5)
     print("--- retrieved context ---")
     print(context[:4000])
@@ -345,9 +357,12 @@ def _cmd_graph(args) -> int:
 def _cmd_benchmark(args) -> int:
     import tempfile
     from ..evaluation import TASK_SPECS, aggregate, build_task_repos, retrieval_eval
+    from ..retrieval import detect_embedding_backend
     with tempfile.TemporaryDirectory() as tmp:
         tasks = build_task_repos(Path(tmp))
-        runs = retrieval_eval(tasks)
+        backend, note = detect_embedding_backend(prefer=args.semantic)
+        print(f"(semantic backend: {backend.label} — {note})")
+        runs = retrieval_eval(tasks, semantic_backend=backend)
         out = Path(args.out) if args.out else _repopilot_dir(Path(".").resolve()) / "benchmark"
         out.mkdir(parents=True, exist_ok=True)
         raw = out / "retrieval_results.json"
