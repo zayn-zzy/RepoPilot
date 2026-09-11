@@ -138,8 +138,14 @@ class SQLiteStore:
 
     # ─── Read ────────────────────────────────────────────────
 
-    def load(self) -> tuple[str, dict[str, FileRecord], dict[str, list[Symbol]], dict[str, list[ImportInfo]], dict[str, list[Reference]]] | None:
-        """Restore the persisted index, or None when the db has no data."""
+    def load(self, target_root: str | None = None) -> tuple[str, dict[str, FileRecord], dict[str, list[Symbol]], dict[str, list[ImportInfo]], dict[str, list[Reference]]] | None:
+        """Restore the persisted index, or None when the db has no data.
+
+        Locations are stored repo-relative and joined onto the SAVED root;
+        ``target_root`` re-joins them onto a different checkout of the
+        same repository instead (a task worktree adopting the main
+        repo's index — Phase 16). The first tuple element is always the
+        saved root, so callers can see where the db came from."""
         try:
             root = self._conn.execute(
                 "SELECT value FROM meta WHERE key = 'root_path'"
@@ -149,6 +155,7 @@ class SQLiteStore:
             root_path = root[0]
         except sqlite3.Error:
             return None
+        join_root = target_root if target_root is not None else root_path
 
         files: dict[str, FileRecord] = {
             row[0]: FileRecord(
@@ -163,7 +170,7 @@ class SQLiteStore:
             " start_line, end_line FROM symbols ORDER BY id"
         ):
             path, name, kind, qname, sig, doc, sl, el = row
-            abs_path = os.path.join(root_path, path)
+            abs_path = os.path.join(join_root, path)
             symbols.setdefault(path, []).append(Symbol(
                 name=name,
                 kind=SymbolKind(kind),
@@ -177,7 +184,7 @@ class SQLiteStore:
             "SELECT file_path, module, symbol, alias, level, lineno FROM imports ORDER BY id"
         ):
             path, module, symbol, alias, level, lineno = row
-            abs_path = os.path.join(root_path, path)
+            abs_path = os.path.join(join_root, path)
             imports.setdefault(path, []).append(ImportInfo(
                 file_path=abs_path, module=module, symbol=symbol, alias=alias,
                 level=level, lineno=lineno,
@@ -187,9 +194,10 @@ class SQLiteStore:
             "SELECT file_path, caller, target, kind, lineno FROM symbol_refs ORDER BY id"
         ):
             path, caller, target, kind, lineno = row
-            abs_path = os.path.join(root_path, path)
+            abs_path = os.path.join(join_root, path)
             references.setdefault(path, []).append(Reference(
                 file_path=abs_path, caller=caller, target=target, kind=kind,
                 lineno=lineno,
             ))
         return root_path, files, symbols, imports, references
+

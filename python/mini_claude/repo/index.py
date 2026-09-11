@@ -72,6 +72,7 @@ class RepositoryIndex:
         self._imports: dict[str, list[ImportInfo]] = {}  # path -> imports
         self._references: dict[str, list[Reference]] = {}  # path -> references
         self._store: SQLiteStore | None = None
+        self._loaded_from_other_root = False             # seeded (Phase 16)
 
     # ─── Build ───────────────────────────────────────────────
 
@@ -277,12 +278,21 @@ class RepositoryIndex:
                 store.close()
             raise
 
-    def load(self, db_path: str | Path | None = None) -> bool:
-        """Restore a previously saved index. Returns False when none exists.
-        After loading, build() runs incrementally against the restored state."""
+    def load(self, db_path: str | Path | None = None, *,
+             allow_other_root: bool = False) -> bool:
+        """Restore a previously saved index. Returns False when none exists
+        or the db belongs to a different root. After loading, build() runs
+        incrementally against the restored state.
+
+        ``allow_other_root`` accepts a db saved for a different checkout
+        of the SAME repository (a task worktree adopting the main repo's
+        index): symbol/import/reference locations are re-rooted onto
+        self.root. Caller responsibility — pass it only when the db is
+        known to come from the same repo (e.g. worktree seeding)."""
         target = Path(db_path) if db_path is not None else self.db_path
         if target is None:
             raise ValueError("no db_path configured — pass one to load() or the constructor")
+        self._loaded_from_other_root = False
         store = self._store if self._store is not None else SQLiteStore(target)
         try:
             restored = store.load()
@@ -294,13 +304,82 @@ class RepositoryIndex:
             return False
         root_path, files, symbols, imports, references = restored
         if root_path != str(self.root):
-            return False  # db belongs to a different root — start fresh
+            if not allow_other_root:
+                return False  # db belongs to a different root — start fresh
+            try:
+                restored = store.load(target_root=str(self.root))
+            except Exception:
+                return False
+            root_path, files, symbols, imports, references = restored
+            self._loaded_from_other_root = True
         self._files = files
         self._symbols = symbols
         self._imports = imports
         self._references = references
         self._rebuild_graph()
         return True
+
+    def load_or_build(self, db_path: str | Path | None = None, *,
+                      allow_other_root: bool = False,
+                      save_back: bool = True,
+                      full: bool = False) -> tuple[IndexBuildResult, str]:
+        """The product entry point (Phase 16): open the persisted index
+        and refresh it — never rebuild what is already saved.
+
+        1. load() restores the saved state; build() then re-parses only
+           changed files (mtime/size pre-filter + sha256 confirm).
+        2. No db → full build; the result is saved so the next command
+           reuses it (``repopilot index`` stays the explicit step, but
+           ask/graph/run keep the db fresh on their own).
+        3. ``allow_other_root`` seeds a task worktree from the main
+           repo's index (locations re-rooted); a seeded index is NEVER
+           written back — the db belongs to the main repo.
+        4. ``full`` forces a rebuild from scratch (ignores the db).
+
+        Returns (build_result, human-readable note of what happened)."""
+        target = Path(db_path) if db_path is not None else self.db_path
+        if target is None:
+            raise ValueError("no db_path configured — pass one to load_or_build() "
+                             "or the constructor")
+        if full:
+            result = self.build()
+            if save_back:
+                self.save(target)
+            return result, (f"full rebuild (saved index ignored) — "
+                            f"{result.files} files, {result.elapsed_s:.1f}s")
+        had_db = target.is_file()
+        loaded = self.load(target, allow_other_root=allow_other_root)
+        result = self.build()
+        if not loaded:
+            note = ("replaced an index from a different root — rebuilt "
+                    if had_db else "no saved index — built fresh")
+            if save_back:
+                self.save(target)
+                note += f" ({result.files} files, {result.elapsed_s:.1f}s, saved)"
+            else:
+                note += f" ({result.files} files, {result.elapsed_s:.1f}s)"
+            return result, note
+        if self._loaded_from_other_root:
+            # Seeded from the main repo's db — never write back.
+            return result, (f"seeded from {target} (main repo index, "
+                            f"{result.files} files){self._change_note(result)}")
+        if result.parsed_files or result.removed_files:
+            note = (f"loaded {target}{self._change_note(result)}")
+            if save_back:
+                self.save(target)
+                note += " → saved"
+            return result, note
+        return result, f"loaded {target} ({result.files} files) — up to date"
+
+    @staticmethod
+    def _change_note(result: IndexBuildResult) -> str:
+        """What the incremental build did ('' when nothing changed)."""
+        parts = []
+        if result.parsed_files:
+            parts.append(f"re-parsed {result.parsed_files} changed file(s)")
+        if result.removed_files:
+            parts.append(f"removed {result.removed_files}")
+        return f" + {', '.join(parts)}" if parts else " — up to date"
 
     def _rebuild_graph(self) -> None:
         self.graph = DependencyGraph()

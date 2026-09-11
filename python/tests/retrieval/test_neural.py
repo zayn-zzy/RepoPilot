@@ -38,6 +38,7 @@ class _FakeBackend:
 
     def __init__(self):
         self.calls = 0
+        self.embedded_texts: list[str] = []
         self._vectors = {
             FILES["calc.py"]: [1.0, 0.0],
             FILES["auth.py"]: [0.0, 1.0],
@@ -47,6 +48,7 @@ class _FakeBackend:
 
     def embed(self, texts):
         self.calls += 1
+        self.embedded_texts += list(texts)
         return [self._vectors.get(t, self._query) for t in texts]
 
 
@@ -91,6 +93,72 @@ class TestNeuralRetriever(unittest.TestCase):
         raw = json.loads(cache.read_text())
         self.assertEqual(raw["backend"], "fake(2d)")
         self.assertEqual(raw["paths"], sorted(changed))
+
+    def test_lsa_always_refits_and_cache_hit_still_searches(self):
+        # Regression: the Phase 14 whole-corpus cache let an LSA backend
+        # "load" its vectors without ever fitting — query transforms then
+        # returned [] and a cache hit produced EMPTY search results.
+        cache = Path(self._tmp.name) / "emb.json"
+        first = NeuralSemanticRetriever(FILES, backend=LSABackend(), cache_path=cache)
+        hits1 = [h.file_path for h in first.search("login password")]
+        second = NeuralSemanticRetriever(FILES, backend=LSABackend(), cache_path=cache)
+        hits2 = [h.file_path for h in second.search("login password")]
+        self.assertTrue(hits1)
+        self.assertEqual(hits2, hits1)
+
+    def test_docwise_cache_reembeds_only_changed_files(self):
+        cache = Path(self._tmp.name) / "emb.json"
+        NeuralSemanticRetriever(FILES, backend=_FakeBackend(), cache_path=cache)
+        changed = dict(FILES)
+        changed["calc.py"] = "def divide(a, b):\n    return a / b\n"
+        backend = _FakeBackend()
+        ret = NeuralSemanticRetriever(changed, backend=backend, cache_path=cache)
+        self.assertEqual(backend.calls, 1)      # one batch…
+        self.assertEqual(backend.embedded_texts, [changed["calc.py"]])  # …of the one changed file
+        hits = ret.search("login")
+        self.assertEqual(hits[0].file_path, "auth.py")  # reused vector still ranks
+        raw = json.loads(cache.read_text())
+        self.assertEqual(raw["backend"], "fake(2d)")
+        self.assertEqual(sorted(raw["per_file"]), sorted(changed))
+
+    def test_docwise_cache_drops_deleted_files(self):
+        cache = Path(self._tmp.name) / "emb.json"
+        NeuralSemanticRetriever(FILES, backend=_FakeBackend(), cache_path=cache)
+        trimmed = {p: c for p, c in FILES.items() if p != "docs.md"}
+        backend = _FakeBackend()
+        NeuralSemanticRetriever(trimmed, backend=backend, cache_path=cache)
+        self.assertEqual(backend.calls, 0)      # remaining docs reused
+        raw = json.loads(cache.read_text())
+        self.assertNotIn("docs.md", raw["per_file"])
+
+    def test_legacy_whole_corpus_cache_is_still_reused(self):
+        # Phase 14/15 caches (vectors + content_key, no per_file) must
+        # still load when the corpus is unchanged.
+        import hashlib
+        cache = Path(self._tmp.name) / "emb.json"
+        backend = _FakeBackend()
+        legacy = {"backend": backend.label,
+                  "content_key": NeuralSemanticRetriever(
+                      FILES, backend=_FakeBackend())._content_key(),
+                  "dim": 2, "paths": sorted(FILES),
+                  "vectors": {p: backend.embed([c])[0] for p, c in FILES.items()}}
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps(legacy))
+        backend2 = _FakeBackend()
+        ret = NeuralSemanticRetriever(FILES, backend=backend2, cache_path=cache)
+        self.assertEqual(backend2.calls, 0)     # whole-corpus key vouches
+        hits = ret.search("login")
+        self.assertEqual(hits[0].file_path, "auth.py")
+
+    def test_cache_invalidated_when_backend_changes(self):
+        cache = Path(self._tmp.name) / "emb.json"
+        NeuralSemanticRetriever(FILES, backend=_FakeBackend(), cache_path=cache)
+        backend = _FakeBackend()
+        backend.label = "other(2d)"
+        NeuralSemanticRetriever(FILES, backend=backend, cache_path=cache)
+        self.assertEqual(backend.calls, 1)      # one batch, all files re-embedded
+        raw = json.loads(cache.read_text())
+        self.assertEqual(raw["backend"], "other(2d)")
 
     def test_lsa_backend_matches_legacy_ranking(self):
         from mini_claude.retrieval import SemanticRetriever

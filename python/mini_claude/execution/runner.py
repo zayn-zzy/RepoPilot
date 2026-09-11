@@ -85,6 +85,7 @@ class DagRunReport:
     pr: Any | None = None                     # PrInfo, attached by the product layer
     runlog_records: list = field(default_factory=list)
     sandbox: str = ""                         # honest record of where commands ran
+    index: str = ""                           # how task indexes were obtained (Phase 16)
     success: bool = False
     note: str = ""
 
@@ -112,6 +113,8 @@ class DagRunReport:
             lines.append(f"  worktree: {self.worktree.path} ({self.worktree.branch})")
         if self.sandbox:
             lines.append(f"  sandbox: {self.sandbox}")
+        if self.index:
+            lines.append(f"  index: {self.index}")
         if self.final_verification:
             lines.append(
                 f"  final verification: "
@@ -188,6 +191,7 @@ class DagRunner:
         self.logger = logger
         self._merge_lock = threading.Lock()
         self._sandbox_runners: list = []      # per-task runners (stats) + final
+        self._index_notes: list[str] = []     # per-task index provenance (Phase 16)
 
     # ─── entry point ──────────────────────────────────────────
 
@@ -245,6 +249,7 @@ class DagRunner:
             report.note = f"scheduler loop failed: {e}"
 
         self._synthesize_unrun_outcomes(report)
+        report.index = self._index_notes[0] if self._index_notes else ""
         self._finalize(report, integration)
         return report
 
@@ -403,7 +408,17 @@ class DagRunner:
         from ..repo import RepositoryIndex
 
         index = RepositoryIndex(info.path)
-        index.build()
+        # Phase 16: the task worktree adopts the main repo's saved index
+        # (locations re-rooted) instead of rebuilding from scratch — a
+        # seeded index is never written back to the main repo's db.
+        seed_db = self.root / ".repopilot" / "index.db"
+        if seed_db.is_file():
+            _, note = index.load_or_build(seed_db, allow_other_root=True,
+                                          save_back=False)
+        else:
+            index.build()
+            note = f"built fresh ({len(index.files())} files)"
+        self._index_notes.append(note)
         mailbox = ArtifactMailbox()
         registry = build_role_registry(index, mailbox, git_root=info.path)
         budget = task.budget

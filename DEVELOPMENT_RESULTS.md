@@ -2698,3 +2698,117 @@ $ repopilot ask "折扣逻辑是什么"      # neural 栈（默认 auto）
 - venv 新增 jieba（纯 Python + 词典，首载 ~0.9s，有磁盘缓存）。
 - 无 jieba 环境自动降级字符 bigram，`zh_method` 始终如实标注。
 - 中文停用词表是内置小表（单字虚词），非完整语言模型。
+
+---
+
+## Phase 16：索引持久化真正复用（load 优先 + 逐文件向量缓存）
+
+用户评审差距 #6："repopilot index 保存了 index.db，但 ask/graph/run
+仍然各自 build()，持久化没有被复用"；Phase 14 注记同源项：向量缓存
+基于全库哈希，单文件修改整体重嵌。本 Phase 让持久化被真正消费，并
+修复由此暴露的 LSA 缓存命中返回空结果的真实 bug。
+
+### 16.1 实现
+
+- `repo/store.py`：`load(target_root=)` —— 落库位置本就是仓库相对路径，
+  现在可重定位到同一仓库的另一个 checkout（task worktree 播种）。
+- `repo/index.py`：
+  - `load(allow_other_root=)`：saved root ≠ 当前 root 时默认拒绝；
+    显式允许时全部绝对路径重定位到当前 root（符号/导入/引用位置
+    指向 worktree 自身，绝不指向主仓库）。
+  - `load_or_build(db_path, *, allow_other_root, save_back, full)`：
+    产品唯一入口——先 load 再增量 build；无库则建库并保存；有变更
+    保存回写；播种的索引永不写回主仓库 db；`full` 强制全量重建；
+    永远返回 `(result, 一句话说明来源)`。
+- CLI：`repopilot index` 复用 + `--full` 强制重建；`ask`/`graph` 打印
+  `(index: loaded ... / re-parsed N / no saved index — built fresh)`。
+- run 路径：`run_requirement`（TeamRunner）与 `DagRunner._run_agent`
+  用主仓库 `.repopilot/index.db` 播种每个任务 worktree 的索引
+  （`allow_other_root=True, save_back=False`），来源如实进入
+  RunReport.index_note / DagRunReport.index 汇总行。
+- `retrieval/semantic.py` 向量缓存 v2：
+  - 神经后端按**逐文件内容哈希**缓存（`per_file`），构建时只重嵌
+    新增/变更文件，删除文件的陈旧条目在复用构建时剪除；旧版
+    全库格式（vectors+content_key）全库未变时仍可整体复用。
+  - **LSA 永远重新 fit、不走缓存**——修复真实 bug：旧缓存让 LSA
+    缓存命中后从不 fit，查询变换返回 []，第二次 ask 空结果
+    （本环境可复现：build1 有命中 → build2 缓存命中 → 命中为空）。
+    LSA 的降维向量离开拟合后的 vectorizer 本就没法查询变换，缓存
+    它无意义——fit 本身就是构建成本。
+
+### 16.2 测试（+16，532/532）
+
+- `tests/repo/test_index.py` TestLoadOrBuild（8）：首建保存+报告、
+  二次加载 up-to-date、单文件变更重解析并回写、播种重定位且主库
+  字节不变（含 save_back=True 仍拒绝写回）、外来库被替换并如实
+  注记、--full 忽略旧库全量重建、allow_other_root 门控。
+- `tests/retrieval/test_neural.py`（5）：LSA 缓存命中仍能搜索
+  （bug 回归）、逐文件缓存只重嵌变更文件（断言只 embed 变更内容）、
+  删除文件条目剪除、旧版全库缓存仍可复用、后端变更整体失效。
+- `tests/product/test_cli.py`（3）：index 二次运行加载 up-to-date、
+  --full 强制重建、graph/ask 复用已存索引（输出 `(index: loaded`）。
+
+```
+$ venv/bin/python -m pytest python/tests/ -q
+532 passed in 419.38s     # 516 + 16
+```
+
+### 16.3 真实验收（RepoPilot 仓库本体，216 文件）
+
+```
+$ venv/bin/python -m mini_claude.product.cli index
+  indexed 216 files, 2240 symbols, 1561 imports, 16653 references (1.1s)
+  index: no saved index — built fresh (216 files, 1.1s, saved)
+
+$ venv/bin/python -m mini_claude.product.cli index      # 第二次
+  indexed 216 files, 2240 symbols, ... (0.2s)
+  index: loaded /data/PR/RepoPilot/.repopilot/index.db (216 files) — up to date
+
+# 追加一行注释到 store.py 后再运行：
+  index: loaded ... + re-parsed 1 changed file(s) → saved
+
+$ repopilot graph          # 0.2s，输出 (index: loaded ... — up to date)
+$ repopilot ask --semantic lsa "worktree 在哪里创建"
+  (index: loaded ... + re-parsed 1 changed file(s) → saved)   # 移回注释自动发现
+  --- retrieved context --- ### test_chinese.py ...          # 有命中
+
+# task worktree 播种（真实 git worktree，/tmp/rp-acceptance-wt）：
+  fresh build:    212 files, 2212 symbols, 0.86s
+  seeded load:    212 files, 2212 symbols, 0.74s
+  note: seeded from .../index.db (main repo index, 212 files) + re-parsed 9 changed file(s), removed 4
+  # 重解析的 9 = worktree(HEAD) 与主工作区（本 Phase 未提交改动）实际不同的文件；
+  # removed 4 = 仅主工作区存在的未跟踪 demo/ 文件——增量对账如实。
+  # 重定位验证：find_definition(...WorktreeManager.create)
+  #   → /tmp/rp-acceptance-wt/python/mini_claude/worktree/manager.py（指向 worktree）
+  # 主库 db 字节级不变（save_back 拒绝写回）。
+```
+
+210 文件级别 fresh 与 seeded 差距小（0.86s vs 0.74s）：该仓库解析快、
+引用图重建（~0.7s，两条路径共同成本）占主导，哈希全部 212 文件仅
+0.01s。真实收益随解析成本放大——合成规模微基准（1200 文件，如实
+标注为合成数据）：
+
+```
+fresh:  1200 files, 2400 symbols, 2800 refs, 0.62s
+reuse:  0 re-parsed, 0.20s        # 3.1x
+1 edit: 1 re-parsed, 0.38s        # 单文件变更只重解析 1 个文件
+```
+
+# 真实 run 验收（.env 真实 DeepSeek key，--sandbox off）：
+$ repopilot run --sandbox off "修复 multiply() 把乘法写成加法的 bug"   # /tmp/run-accept 干净仓库
+  run T37288: SUCCESS (2 task(s): succeeded=2)
+    - T-B-1 [coder]  succeeded commit=54fb880a7c9a tests 2/2 $0.0137
+    - T-B-2 [tester] succeeded commit=4ca3fd0e8cde tests 3/3 repair=1x $0.0766
+  index: seeded from /tmp/run-accept/.repopilot/index.db (main repo index, 2 files) — up to date
+  final verification: PASS 3/3 tests
+  # 每个任务 worktree 的索引都从主仓库 index.db 播种（run 汇总行如实报告来源）
+
+### 16.4 如实注记
+
+- 播种后 worktree 全文件 mtime 都是新 checkout 时间 → 首次播种对
+  每个文件做 sha256 确认（实测 212 文件 0.01s，远小于解析），内容
+  未变则不解析。
+- `touch` 只改 mtime 不解析（哈希确认内容未变）——设计行为。
+- LSA 栈每次 ask 重新 fit（修复 bug 的代价；LSA 是确定性回退，
+  fit 即其构建成本），逐文件缓存只服务神经后端。
+- 旧版 embeddings-cache.json（Phase 14/15）仍可复用（全库未变时）。

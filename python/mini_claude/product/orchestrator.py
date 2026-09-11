@@ -43,6 +43,7 @@ class RunReport:
     commit: str = ""
     pr: PrInfo | None = None
     runlog_records: list[RunRecord] = field(default_factory=list)
+    index_note: str = ""     # how the worktree index was obtained (Phase 16)
     success: bool = False
     note: str = ""
 
@@ -50,6 +51,8 @@ class RunReport:
         lines = [f"run {self.task_id}: {'SUCCESS' if self.success else 'FAILED'}"]
         if self.worktree is not None:
             lines.append(f"  worktree: {self.worktree.path} ({self.worktree.branch})")
+        if self.index_note:
+            lines.append(f"  index: {self.index_note}")
         if self.team_result is not None:
             lines.append(f"  roles run: "
                          f"{[o.role for o in self.team_result.outcomes]}")
@@ -118,7 +121,16 @@ async def run_requirement(root: str | Path, requirement: str | Requirement, *,
     try:
         from ..repo import RepositoryIndex
         index = RepositoryIndex(info.path)
-        index.build()
+        # Phase 16: the task worktree adopts the main repo's saved index
+        # (locations re-rooted) instead of rebuilding from scratch — a
+        # seeded index is never written back to the main repo's db.
+        seed_db = root / ".repopilot" / "index.db"
+        if seed_db.is_file():
+            _, report.index_note = index.load_or_build(
+                seed_db, allow_other_root=True, save_back=False)
+        else:
+            index.build()
+            report.index_note = f"built fresh ({len(index.files())} files)"
         team = TeamRunner(TeamConfig(
             model=model, index=index, api_key=api_key,
             anthropic_base_url=anthropic_base_url,

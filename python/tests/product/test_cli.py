@@ -76,11 +76,40 @@ class TestCli(unittest.TestCase):
         self.assertIn("indexed 3 files", p.stdout)
         self.assertTrue((self.repo / ".repopilot" / "index.db").exists())
 
+    def test_index_rerun_loads_saved_index(self):
+        p = _run(self.repo, "index")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        p2 = _run(self.repo, "index")
+        self.assertEqual(p2.returncode, 0, p2.stderr)
+        self.assertIn("indexed 3 files", p2.stdout)
+        self.assertIn("loaded", p2.stdout)
+        self.assertIn("up to date", p2.stdout)
+
+    def test_index_full_flag_forces_rebuild(self):
+        _run(self.repo, "index")
+        p = _run(self.repo, "index", "--full")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("full rebuild", p.stdout)
+
     def test_graph_prints_edges(self):
         p = _run(self.repo, "graph")
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertIn("modules:", p.stdout)
         self.assertIn("stats -> calc", p.stdout)
+        self.assertIn("no saved index — built fresh", p.stdout)
+
+    def test_graph_and_ask_reuse_saved_index(self):
+        p = _run(self.repo, "index")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        p = _run(self.repo, "graph")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("(index: loaded", p.stdout)
+        p = _run(self.repo, "ask", "--semantic", "lsa",
+                 "where is multiply called")
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertIn("(index: loaded", p.stdout)
+        self.assertIn("--- retrieved context ---", p.stdout)
+        self.assertIn("calc.py", p.stdout)
 
     def test_plan_deterministic_without_key(self):
         p = _run(self.repo, "plan",

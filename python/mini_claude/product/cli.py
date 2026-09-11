@@ -74,6 +74,10 @@ def main(argv: list[str] | None = None) -> int:
 
     p_index = sub.add_parser("index", help="build and persist the repository index")
     p_index.add_argument("dir", nargs="?", default=".")
+    p_index.add_argument("--full", action="store_true",
+                         help="force a full rebuild, ignoring the saved index "
+                              "(default: load .repopilot/index.db and re-parse "
+                              "only changed files)")
 
     p_ask = sub.add_parser("ask", help="answer a question using retrieval + LLM")
     p_ask.add_argument("question", help="the question about this repository")
@@ -180,11 +184,9 @@ def _cmd_init(args) -> int:
 def _cmd_index(args) -> int:
     from ..repo import RepositoryIndex
     root = Path(args.dir).resolve()
-    index = RepositoryIndex(root)
-    result = index.build()
     db = _repopilot_dir(root) / "index.db"
-    db.parent.mkdir(exist_ok=True)
-    index.save(db)
+    index = RepositoryIndex(root)
+    result, note = index.load_or_build(db, full=args.full)
     print(f"indexed {result.files} files, {result.symbols} symbols, "
           f"{result.imports} imports, {result.references} references "
           f"({result.elapsed_s:.1f}s)")
@@ -193,6 +195,7 @@ def _cmd_index(args) -> int:
             f"{lang}={n} [{result.parser_kinds.get(lang, '')}]"
             for lang, n in sorted(result.files_by_language.items()))
         print(f"  languages: {langs}")
+    print(f"  index: {note}")
     print(f"  saved: {db}")
     return 0
 
@@ -202,7 +205,8 @@ def _cmd_ask(args) -> int:
     from ..repo import RepositoryIndex
     root = Path(args.dir).resolve()
     index = RepositoryIndex(root)
-    index.build()
+    _, index_note = index.load_or_build(_repopilot_dir(root) / "index.db")
+    print(f"(index: {index_note})")
     backend, note = detect_embedding_backend(prefer=args.semantic)
     cache = _repopilot_dir(root) / "embeddings-cache.json"
     retriever = HybridRetriever(index, semantic_backend=backend,
@@ -342,7 +346,8 @@ def _cmd_graph(args) -> int:
     from ..repo import RepositoryIndex
     root = Path(args.dir).resolve()
     index = RepositoryIndex(root)
-    index.build()
+    _, index_note = index.load_or_build(_repopilot_dir(root) / "index.db")
+    print(f"(index: {index_note})")
     graph = index.graph
     modules = graph.modules()
     edges = sum(len(index.module_dependencies(m)) for m in modules)
