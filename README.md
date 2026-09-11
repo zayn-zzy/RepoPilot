@@ -16,7 +16,7 @@ Runtime、仓库智能、混合检索、任务规划、多代理团队、Git Wor
 | 模块 | 状态 | 位置 |
 |------|------|------|
 | Agent Runtime（配置/注册表/ACL/预算/上下文/事件+Trace） | ✅ | `mini_claude/runtime/` |
-| Repository Intelligence（扫描/AST/符号索引/依赖图/增量 SQLite 持久化） | ✅ | `mini_claude/repo/` |
+| Repository Intelligence（多语言扫描/AST/符号索引/依赖图+调用引用图/增量 SQLite 持久化） | ✅ Python+JS/TS(TSX) 经 tree-sitter 解析，java/c/cpp/go/rust/csharp/ruby/php 经 regex 回退（如实标注）；跨文件调用图/引用图 | `mini_claude/repo/` |
 | Hybrid Retrieval（词法 BM25/语义 LSA/结构图/融合重排/上下文构建） | ✅ | `mini_claude/retrieval/` |
 | Requirement + Task DAG（解析/七状态机/拓扑调度/重试） | ✅ | `mini_claude/planning/` |
 | Multi-Agent（Planner/Explorer/Coder/Tester/Reviewer + Artifact 邮箱） | ✅ | `mini_claude/agents/` |
@@ -69,7 +69,7 @@ Changed）。GitHub PR 创建通过 `gh` CLI（未安装时给出可直接执行
 ## 测试
 
 ```bash
-python -m pytest python/tests/ -q      # 当前 481/481
+python -m pytest python/tests/ -q      # 当前 492/492
 ```
 
 覆盖：单元/集成/E2E（E2E = 脚本化 LLM 驱动真实 Agent 循环走完整

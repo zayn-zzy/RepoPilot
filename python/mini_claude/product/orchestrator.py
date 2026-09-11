@@ -164,7 +164,7 @@ async def run_requirement(root: str | Path, requirement: str | Requirement, *,
     # pytest caches) are not source changes — purge them from the
     # worktree before collecting the diff (they must never enter the
     # task patch or the commit).
-    for cache in ("__pycache__", ".pytest_cache"):
+    for cache in ("__pycache__", ".pytest_cache", ".mypy_cache"):
         for p in info.path.rglob(cache):
             if p.is_dir():
                 import shutil

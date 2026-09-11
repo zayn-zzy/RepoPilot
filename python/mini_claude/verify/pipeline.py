@@ -172,8 +172,15 @@ class VerificationPipeline:
         if not files:
             return StageResult(stage="lint", status="passed",
                                command=f"{tool} (no files)", detail="no .py files to lint")
-        argv = ([tool, "check"] if tool == "ruff" else [tool]) + files
-        command = f"{tool} check {' '.join(files)}" if tool == "ruff" else f"{tool} {' '.join(files)}"
+        # Run the SAME form the probe verified: a module detected via
+        # `python -m` runs via `python -m` (a PATH binary from another
+        # environment would not import under this python).
+        if self.tools.lint_module:
+            argv = [self.tools.python, "-m", tool] + \
+                   (["check"] if tool == "ruff" else []) + files
+        else:
+            argv = ([tool, "check"] if tool == "ruff" else [tool]) + files
+        command = " ".join(argv)
         p = self._run_cmd(argv)
         return StageResult(stage="lint", status=self._status(p),
                            command=command, exit_code=p.returncode,
@@ -190,7 +197,12 @@ class VerificationPipeline:
         if not files:
             return StageResult(stage="typecheck", status="passed",
                                command=f"{tool} (no files)", detail="no .py files to check")
-        argv = ([self.tools.python, "-m", tool] if tool == "mypy" else [tool]) + files
+        # Same-form rule as lint: `python -m mypy` only when the module
+        # probe succeeded.
+        if self.tools.type_module:
+            argv = [self.tools.python, "-m", tool] + files
+        else:
+            argv = [tool] + files
         command = " ".join(argv)
         p = self._run_cmd(argv)
         return StageResult(stage="typecheck", status=self._status(p),

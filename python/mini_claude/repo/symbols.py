@@ -12,6 +12,7 @@ class SymbolKind(str, Enum):
     FUNCTION = "function"
     CLASS = "class"
     METHOD = "method"
+    INTERFACE = "interface"   # TypeScript interface declarations
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,23 @@ class ImportInfo:
         return self.alias or self.module.split(".")[0]
 
 
+@dataclass(frozen=True)
+class Reference:
+    """One symbol-level reference inside a file — the raw material of the
+    call/reference graph: a call, an attribute access, etc.
+
+    ``caller`` is the qualified name of the containing symbol ("" for
+    module-level code); ``target`` is the name as written (e.g. "helper",
+    "mod.helper", "self.items.append"). Whether it resolves to a known
+    symbol is decided at INDEX time, not parse time."""
+
+    file_path: str
+    caller: str
+    target: str
+    kind: str                      # "call" | "attribute"
+    lineno: int = 0
+
+
 @dataclass
 class ParsedModule:
     """Everything the parser extracts from one file."""
@@ -66,6 +84,7 @@ class ParsedModule:
     module_name: str | None
     symbols: list[Symbol] = field(default_factory=list)
     imports: list[ImportInfo] = field(default_factory=list)
+    references: list[Reference] = field(default_factory=list)
     has_syntax_error: bool = False
     content_hash: str = ""
 

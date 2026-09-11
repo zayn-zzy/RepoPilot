@@ -1,6 +1,7 @@
 """Tree-sitter based Python parser — extracts functions, classes, methods
-(including nested ones) and module-level import statements, tolerating
-syntax errors.
+(including nested ones), module-level import statements, and symbol-level
+REFERENCES (calls and attribute accesses) for the call/reference graph,
+tolerating syntax errors.
 
 Tree-sitter recovers from malformed input, so a file with a syntax error still
 yields the symbols in its valid regions (flag set on the ParsedModule).
@@ -12,12 +13,22 @@ multi-byte UTF-8 content (box-drawing chars, CJK comments, emoji)."""
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 
 import tree_sitter_python
 from tree_sitter import Language, Parser
 
-from .symbols import ImportInfo, Location, ParsedModule, Symbol, SymbolKind
+from .symbols import (
+    ImportInfo,
+    Location,
+    ParsedModule,
+    Reference,
+    Symbol,
+    SymbolKind,
+)
+
+_IDENTIFIER_PATH_RE = re.compile(r"[A-Za-z_]\w*(\.[A-Za-z_]\w*)*")
 
 _LANGUAGE = Language(tree_sitter_python.language())
 
@@ -72,6 +83,15 @@ class PythonParser:
             if self._is_module_level(node):
                 self._extract_import(node, mod)
             return  # never descend into imports
+
+        if ntype == "call":
+            self._extract_reference(node, scope, mod, kind="call")
+            # keep walking — arguments may contain nested calls
+        elif ntype == "attribute":
+            self._extract_reference(node, scope, mod, kind="attribute")
+            return  # the attribute's parts are identifiers; nothing below
+        elif ntype == "identifier":
+            return  # a bare name is not a reference edge (too noisy)
 
         for child in node.children:
             self._walk(child, scope, mod)
@@ -218,6 +238,42 @@ class PythonParser:
                 level=level,
                 lineno=node.start_point[0] + 1,
             ))
+
+    # ─── References (call / reference graph) ─────────────────
+
+    def _extract_reference(self, node, scope: list[str], mod: ParsedModule,
+                           kind: str) -> None:
+        """One call/attribute reference. ``caller`` = the qualified name
+        of the enclosing symbol (module name for module-level code)."""
+        if kind == "call":
+            callee = node.child_by_field_name("function")
+            if callee is None:
+                return
+            text = self._text(callee)
+            # super().x and cls().y are dispatch, not graph edges.
+            if text.startswith("super().") or text.startswith("cls()."):
+                return
+        else:  # attribute
+            text = self._text(node)
+            # Receiver member reads (self.x) are not cross-symbol
+            # references — method CALLS on self/this stay (they resolve
+            # against the enclosing class).
+            if text.startswith(("self.", "cls.")):
+                return
+        if not _IDENTIFIER_PATH_RE.fullmatch(text):
+            return  # e.g. f-string/string method calls on literals, chained subscripts
+        caller = self._caller_qualified(mod, scope)
+        mod.references.append(Reference(
+            file_path=mod.file_path,
+            caller=caller,
+            target=text,
+            kind=kind,
+            lineno=node.start_point[0] + 1,
+        ))
+
+    def _caller_qualified(self, mod: ParsedModule, scope: list[str]) -> str:
+        parts = ([mod.module_name] if mod.module_name else []) + scope
+        return ".".join(parts)
 
     # ─── Helpers ─────────────────────────────────────────────
 

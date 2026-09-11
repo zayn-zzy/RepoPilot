@@ -102,9 +102,15 @@ class TestPipeline(unittest.TestCase):
         self.assertIn("pytest", failure.command)
         # The chain stopped there: no later stages ran.
         self.assertEqual([s.stage for s in report.stages][-1], "targeted_test")
-        # The selection record is honest about absent tools.
-        self.assertIn("skipped", report.selected_tools["lint"] or "skipped")
-        self.assertIn("skipped", report.selected_tools["typecheck"] or "skipped")
+        # The selection record is honest about the environment: a missing
+        # tool is recorded as skipped, a present one by name (this env may
+        # expose real flake8/mypy binaries — the record must never lie).
+        lint = report.selected_tools["lint"] or ""
+        self.assertTrue("skipped" in lint or lint in ("ruff", "flake8", "pyflakes"),
+                        lint)
+        typecheck = report.selected_tools["typecheck"] or ""
+        self.assertTrue("skipped" in typecheck or typecheck in ("mypy", "pyright"),
+                        typecheck)
         self.assertEqual(report.selected_tools["test_runner"], "pytest")
 
     def test_syntax_stage_catches_broken_file_first(self):

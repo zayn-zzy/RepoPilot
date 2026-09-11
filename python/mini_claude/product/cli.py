@@ -178,7 +178,13 @@ def _cmd_index(args) -> int:
     db.parent.mkdir(exist_ok=True)
     index.save(db)
     print(f"indexed {result.files} files, {result.symbols} symbols, "
-          f"{result.imports} imports ({result.elapsed_s:.1f}s)")
+          f"{result.imports} imports, {result.references} references "
+          f"({result.elapsed_s:.1f}s)")
+    if result.files_by_language:
+        langs = ", ".join(
+            f"{lang}={n} [{result.parser_kinds.get(lang, '')}]"
+            for lang, n in sorted(result.files_by_language.items()))
+        print(f"  languages: {langs}")
     print(f"  saved: {db}")
     return 0
 
