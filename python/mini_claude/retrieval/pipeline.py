@@ -24,8 +24,12 @@ DEFAULT_WEIGHTS = {"lexical": 1.0, "semantic": 1.0, "structural": 0.6}
 
 def grep_baseline(files: dict[str, str], query: str, top_k: int = 10) -> list[RetrievalHit]:
     """Plain regex grep ranked by total match count — the benchmark's
-    Baseline A. Every literal query token is OR-ed as a regex."""
+    Baseline A. Every literal query token is OR-ed as a regex; Chinese
+    queries contribute their CJK spans as literal terms (a pure-Chinese
+    query used to match nothing)."""
     tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", query)
+    from .chinese import cjk_spans
+    tokens += cjk_spans(query)
     if not tokens:
         return []
     pattern = re.compile("|".join(re.escape(t) for t in tokens), re.IGNORECASE)

@@ -8,6 +8,7 @@ import math
 import re
 from collections import Counter
 
+from .chinese import tokenize_chinese
 from .model import RetrievalHit
 
 _TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
@@ -18,7 +19,12 @@ SYMBOL_FIELD_BOOST = 2.0
 
 
 def tokenize(text: str) -> list[str]:
-    return [t.lower() for t in _TOKEN_RE.findall(text)]
+    """ASCII identifier tokens + Chinese words (jieba/bigram) — the
+    corpus side and the query side share this, so a Chinese query term
+    and a Chinese comment in a file meet in the same index."""
+    tokens = [t.lower() for t in _TOKEN_RE.findall(text)]
+    tokens += tokenize_chinese(text)
+    return tokens
 
 
 class LexicalRetriever:

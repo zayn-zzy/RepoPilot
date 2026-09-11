@@ -158,12 +158,19 @@ class LSABackend:
     back to before neural embeddings were wired in."""
 
     def __init__(self, n_components: int = 100, random_state: int = 42):
+        from .chinese import expand_cjk_bigrams
         self.label = f"lsa({n_components}d)"
         self._n = n_components
         self._state = random_state
+        # CJK runs are expanded to space-separated bigrams BEFORE the
+        # token pattern runs — the pattern accepts those 1-2 char words
+        # (an ASCII-only pattern would drop every Chinese token again).
+        # A custom preprocessor REPLACES sklearn's default lowercase
+        # step, so lowercasing happens inside it (lowercase=False here).
         self._vec = TfidfVectorizer(
-            token_pattern=r"[A-Za-z_][A-Za-z0-9_]+",
-            lowercase=True, sublinear_tf=True)
+            preprocessor=lambda t: expand_cjk_bigrams(t).lower(),
+            token_pattern=r"(?:[a-z_][a-z0-9_]*|[一-鿿]{1,2})",
+            lowercase=False, sublinear_tf=True)
         self._svd: TruncatedSVD | None = None
         self._dim: int | None = None
         self._fitted_on: tuple[str, ...] = ()
@@ -174,7 +181,8 @@ class LSABackend:
 
     def fit(self, corpus: list[str]) -> "LSABackend":
         """LSA is corpus-relative: fit once on the indexed texts, then
-        embed queries into the same latent space."""
+        embed queries into the same latent space (the vectorizer's
+        preprocessor expands CJK runs to bigrams)."""
         self._fitted_on = tuple(corpus)
         if corpus:
             tfidf = self._vec.fit_transform(corpus)

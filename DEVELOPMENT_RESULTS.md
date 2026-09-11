@@ -2643,3 +2643,58 @@ $ repopilot ask --semantic local "multiply 函数在哪里被调用"
 - 大仓库注意：JSON 缓存为可读格式（1000 文件约 6MB）；向量缓存失效
   基于全库内容哈希，单文件修改会整体重嵌（增量失效是后续优化项，
   与 #6 索引 load() 复用同源）。
+
+---
+
+## Phase 15：中文检索增强
+
+用户评审差距 #5："Query Analyzer 和 BM25 只提取 ASCII 标识符……纯中文
+问题可能得到空检索结果"。本 Phase 让中文词元进入全部检索路径。
+
+### 15.1 实现
+
+- 新增 `retrieval/chinese.py`：CJK 词元化——jieba 分词（安装时，带中文
+  停用词表）或字符 bigram（无依赖降级，标注 method）；`expand_cjk_bigrams`
+  把 CJK 串展开为空格分隔 bigram（给 ASCII-only 索引器用）。
+- `analyzer.py`：中文词进 `terms`（英文词之后），`AnalyzedQuery.zh_method`
+  记录实际词元化方式——纯中文 query 不再产出零词元。
+- `lexical.py tokenize()`：语料与查询共享同一分词 → 中文注释/文档进入
+  BM25 索引，中文查询词与中文注释在同一索引相遇。
+- `pipeline.grep_baseline`：CJK span 作为字面量正则项（纯中文 grep 不再空）。
+- `embedding.LSABackend`：TF-IDF 的 preprocessor 展开 CJK bigram +
+  token_pattern 接受 1-2 字中文词（否则 ASCII pattern 会把展开后的中文
+  再滤掉）；自定义 preprocessor 会覆盖 sklearn 默认 lowercase——小写
+  在 preprocessor 内完成（真实发现的坑，测试锁定）。
+- neural 栈无需改动：bge-small-en-v1.5 本身支持中文。
+
+### 15.2 测试（+12，516/516）
+
+`tests/retrieval/test_chinese.py`：jieba 词元与停用词、bigram 降级、
+混合文本只切 CJK、无 jieba 时 method 如实标注、纯中文 query 词元非空、
+BM25 中文注释命中（登录/订单两用例）、grep 中文命中、LSA 中文可见、
+legacy 英文排序与旧实现一致（token 模式回归）。
+
+```
+$ venv/bin/python -m pytest python/tests/ -q
+516 passed in 376.88s        # 504 + 12
+```
+
+### 15.3 真实验收（纯中文问题，修复前 = 空结果）
+
+```
+$ repopilot ask --semantic lsa "订单总价在哪里计算"
+  (semantic backend: lsa(100d) — ...)
+  --- retrieved context ---
+  ### pricing.py          # 第一命中（中文 docstring 定价模块）
+
+$ repopilot ask "折扣逻辑是什么"      # neural 栈（默认 auto）
+  (semantic backend: neural(fastembed:...) — ...)
+  --- retrieved context ---
+  ### pricing.py          # 第一命中
+```
+
+### 15.4 如实注记
+
+- venv 新增 jieba（纯 Python + 词典，首载 ~0.9s，有磁盘缓存）。
+- 无 jieba 环境自动降级字符 bigram，`zh_method` 始终如实标注。
+- 中文停用词表是内置小表（单字虚词），非完整语言模型。
