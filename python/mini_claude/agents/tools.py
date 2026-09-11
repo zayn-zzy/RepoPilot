@@ -55,6 +55,18 @@ def make_repo_tools(index, git_root=None) -> list[Tool]:
         module = index.graph.module_of_file(path)
         if module:
             lines.append(f"module dependencies of {module}: {index.module_dependencies(module)}")
+        # Phase 13: symbol-level call/reference edges for this file.
+        try:
+            callees = index.callees_in_file(path)
+            callers = index.callers_of_file(path)
+        except Exception:
+            callees, callers = [], []
+        if callees:
+            lines.append("calls out of this file (top targets): " + ", ".join(
+                f"{t}({c}x)" for t, c in callees))
+        if callers:
+            lines.append("files calling into this file: " + ", ".join(
+                f"{f}({c}x)" for f, c in callers))
         return "\n".join(lines)
 
     def semantic_search(inp: dict) -> str:
