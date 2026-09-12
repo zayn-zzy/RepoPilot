@@ -21,6 +21,24 @@ def _uuid() -> str:
     return uuid.uuid4().hex
 
 
+class Plan(Base):
+    __tablename__ = "plans"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True,
+                                    default=_uuid)
+    repository_id: Mapped[str | None] = mapped_column(String(32),
+                                                      nullable=True)
+    requirement_title: Mapped[str] = mapped_column(String(500),
+                                                   default="")
+    requirement_kind: Mapped[str] = mapped_column(String(64), default="")
+    requirement_description: Mapped[str] = mapped_column(Text, default="")
+    model: Mapped[str] = mapped_column(String(255), default="")
+    planner: Mapped[str] = mapped_column(String(32), default="deterministic")
+    nodes_json: Mapped[str] = mapped_column(Text, default="[]")
+    edges_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
 class Repository(Base):
     __tablename__ = "repositories"
 
