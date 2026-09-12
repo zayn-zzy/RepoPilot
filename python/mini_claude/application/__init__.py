@@ -8,6 +8,7 @@ from .benchmark import BenchmarkResult, BenchmarkService
 from .errors import ApplicationError
 from .graph import GraphResult, GraphService
 from .planning import PlanResult, PlanningService, plan_to_web
+from .registry import RegistryContext, RepositoryRegistry
 from .repository import (IndexResult, IndexStatus, InitResult,
                          RepositoryService)
 from .run import RunResult, RunService
@@ -19,5 +20,6 @@ __all__ = [
     "GraphResult", "GraphService",
     "PlanResult", "PlanningService", "plan_to_web",
     "IndexResult", "IndexStatus", "InitResult", "RepositoryService",
+    "RegistryContext", "RepositoryRegistry",
     "RunResult", "RunService",
 ]
