@@ -162,13 +162,20 @@ class DagRunner:
                  manager: WorktreeManager | None = None,
                  recorder_factory: RecorderFactory | None = None,
                  logger: Any | None = None,
+                 event_sink: Callable[[dict], None] | None = None,
+                 cancel_check: Callable[[], bool] | None = None,
                  ):
         """``sandbox`` is the Phase 12 command-execution mode for every
         task's shell/tests/verification: "off" = host (pre-wiring),
         "auto" = docker when available else host with an honest note,
         "on" = docker required (unavailable docker fails the run up
         front). ``sandbox_builder(worktree_path)`` injects the
-        per-task SandboxedCommandRunner (tests)."""
+        per-task SandboxedCommandRunner (tests).
+
+        Web Phase 5 hooks: ``event_sink(dict)`` receives task/agent/
+        verification lifecycle events (thread-safe by contract — the
+        Web worker's publisher), and ``cancel_check()`` is polled at
+        task boundaries (§45: a cancel is never cosmetic)."""
         self.root = Path(root).resolve()
         self.plan = plan
         self.task_id = task_id
@@ -192,6 +199,8 @@ class DagRunner:
         self._merge_lock = threading.Lock()
         self._sandbox_runners: list = []      # per-task runners (stats) + final
         self._index_notes: list[str] = []     # per-task index provenance (Phase 16)
+        self.event_sink = event_sink          # Web Phase 5 (thread-safe by contract)
+        self.cancel_check = cancel_check      # Web Phase 5 (§45)
 
     # ─── entry point ──────────────────────────────────────────
 
@@ -302,8 +311,11 @@ class DagRunner:
         except Exception as e:
             outcome.status = "failed"
             outcome.error = f"worktree creation failed: {e}"
+            self._emit_outcome(outcome, task)
             return outcome
 
+        self._emit("task.started", task_id=task.id,
+                   agent_id=task.agent_role)
         # This thread's file/shell tools resolve against the task worktree
         # (thread-local root) — parallel task threads can never touch each
         # other's checkout, and the process cwd becomes irrelevant.
@@ -315,6 +327,7 @@ class DagRunner:
                 outcome.error = ("sandbox mode 'on' but docker is unavailable"
                                  f" ({sandbox._probe_reason or 'daemon unreachable'})")
                 set_work_root(None)
+                self._emit_outcome(outcome, task)
                 return outcome
             set_sandbox(sandbox)
             self._sandbox_runners.append(sandbox)
@@ -324,6 +337,7 @@ class DagRunner:
         finally:
             set_sandbox(None)
             set_work_root(None)
+        self._emit_outcome(outcome, task)
         return outcome
 
     def _run_task_body(self, task: TaskNode, info: WorktreeInfo,
@@ -332,6 +346,13 @@ class DagRunner:
                        sandbox=None) -> None:
         run_result = None
         recorder = None
+        if self.cancel_check is not None and self.cancel_check():
+            # §45: a cancel is checked at the task boundary — the task
+            # never starts, the run turns CANCELLED (never cosmetic).
+            outcome.status = "cancelled"
+            outcome.error = "cancelled by user"
+            self._record(recorder, run_result, outcome, report)
+            return
         try:
             run_result, cost, recorder = asyncio.run(
                 self._run_agent(task, info, requirement))
@@ -342,8 +363,19 @@ class DagRunner:
             self._record(recorder, run_result, outcome, report)
             return
 
+        self._emit("verification.started", task_id=task.id,
+                   agent_id=task.agent_role)
         outcome.verification, outcome.repair = self._verify_and_repair(
             task, info, sandbox)
+        self._emit("verification.passed" if outcome.verification["passed"]
+                   else "verification.failed", task_id=task.id,
+                   agent_id=task.agent_role,
+                   message=outcome.verification.get("summary", "")[:300])
+        if outcome.repair.get("attempts"):
+            self._emit("repair.completed", task_id=task.id,
+                       agent_id=task.agent_role,
+                       message=(f"{outcome.repair['attempts']} attempt(s), "
+                                f"success={outcome.repair.get('success')}"))
         outcome.cost_usd += outcome.repair.get("total_cost_usd", 0.0)
 
         _purge_caches(info.path)
@@ -433,6 +465,8 @@ class DagRunner:
         )
         if self._after_build is not None:
             self._after_build(runtime, task)
+        if self.event_sink is not None:
+            _subscribe_agent_events(runtime, self.event_sink, task)
         recorder = None
         if self._recorder_factory is not None:
             recorder = self._recorder_factory(task.title, task.agent_role)
@@ -509,6 +543,31 @@ class DagRunner:
 
     # ─── recording + finalization ─────────────────────────────
 
+    def _emit(self, event_type: str, *, task_id: str | None = None,
+              agent_id: str | None = None, status: str | None = None,
+              message: str | None = None, payload: dict | None = None) -> None:
+        """Web Phase 5: forward a lifecycle event to the sink (the
+        worker's publisher — thread-safe by its contract)."""
+        if self.event_sink is None:
+            return
+        try:
+            self.event_sink({
+                "event_type": event_type, "task_id": task_id,
+                "agent_id": agent_id, "status": status,
+                "message": message, "payload": payload or {},
+            })
+        except Exception:
+            pass  # observability must never break the run
+
+    def _emit_outcome(self, outcome: TaskOutcome, task: TaskNode) -> None:
+        """task.completed/failed/conflict/cancelled from the outcome."""
+        event_map = {"succeeded": "task.completed", "failed": "task.failed",
+                     "conflict": "task.failed", "cancelled": "task.failed",
+                     "blocked": "task.failed"}
+        event_type = event_map.get(outcome.status, "task.failed")
+        self._emit(event_type, task_id=task.id, agent_id=task.agent_role,
+                   status=outcome.status, message=outcome.error or "")
+
     def _record(self, recorder, run_result, outcome: TaskOutcome,
                 report: DagRunReport) -> None:
         if recorder is None or run_result is None:
@@ -543,6 +602,7 @@ class DagRunner:
                                ("failed", "blocked")]
                 outcome.error = ("blocked: dependency "
                                  + ", ".join(failed_deps) + " did not succeed")
+                self._emit_outcome(outcome, node)
             report.outcomes.append(outcome)
         order = report.plan.topological_order()
         report.outcomes.sort(key=lambda o: order.index(o.task_id))
@@ -608,6 +668,39 @@ class DagRunner:
             report.note = (report.note + "; " if report.note else "") + \
                           ("tasks not succeeded: "
                            + ", ".join(f"{o.task_id}={o.status}" for o in broken))
+
+
+def _subscribe_agent_events(runtime, sink, task: "TaskNode") -> None:
+    """Web Phase 5: the runtime's own EventEmitter (Phase 1) becomes the
+    agent/tool event source — per-type subscription, mapped to the §7
+    event vocabulary. A listener error never affects the agent (the
+    emitter swallows handler exceptions)."""
+    from ..runtime import AgentEvents
+
+    mapping = {
+        AgentEvents.RUN_STARTED: "agent.started",
+        AgentEvents.RUN_FINISHED: "agent.completed",
+        AgentEvents.TOOL_CALL: "tool.started",
+        AgentEvents.TOOL_RESULT: "tool.completed",
+        AgentEvents.PERMISSION_DENIED: "tool.failed",
+        AgentEvents.BUDGET_EXCEEDED: "agent.failed",
+    }
+
+    def handler(runtime_event: dict) -> None:
+        data = runtime_event or {}
+        event_type = mapping.get(data.get("type", ""))
+        if event_type is None:
+            return
+        sink({
+            "event_type": event_type,
+            "task_id": task.id,
+            "agent_id": task.agent_role,
+            "message": str(data.get("message") or "")[:500],
+            "payload": dict(data),
+        })
+
+    for source in mapping:
+        runtime.events.on(source, handler)
 
 
 def _purge_caches(path: Path) -> None:

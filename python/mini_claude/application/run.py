@@ -43,10 +43,16 @@ class RunService:
                   squash: bool = False,
                   after_build: Callable[[Any], None] | None = None,
                   logger: Any | None = None,
+                  event_sink: Callable[[dict], None] | None = None,
+                  cancel_check: Callable[[], bool] | None = None,
                   ) -> RunResult:
         """Run one requirement through its Task DAG and the optional
         GitHub flow. Everything here is the same code path the CLI
-        uses (product.orchestrator + product.github_flow)."""
+        uses (product.orchestrator + product.github_flow).
+
+        Web Phase 5: ``event_sink`` receives task/agent/verification
+        lifecycle events (the worker's publisher) and ``cancel_check``
+        is polled at task boundaries (§45)."""
         from ..product.orchestrator import run_dag_requirement
         root = Path(path).resolve()
         if not api_key:
@@ -59,6 +65,7 @@ class RunService:
             model=model, api_key=api_key, anthropic_base_url=base_url,
             jobs=jobs, sandbox=sandbox, commit=commit,
             after_build=after_build, logger=logger,
+            event_sink=event_sink, cancel_check=cancel_check,
         )
         result = RunResult(task_id=run_id, report=report,
                            success=bool(report.success))

@@ -3290,3 +3290,117 @@ origin/feat/web-phase-04-plan-ask-api
 ### Known Issues
 - ask 的 LLM answer 使用服务器 env 的 key（与 CLI 同源）；无 key 时
   has_answer=false 且不报错（诚实降级为纯检索）。
+
+---
+
+# Web Phase 5：Run Worker + Redis Streams + Event + SSE
+
+### Goal
+规约 §12/§13/§15/§33/§45：异步 Run 架构（POST → 202 → Worker → Core →
+事件 → SSE）、Redis Streams（consumer group/ACK/Dead Letter/心跳/崩溃
+恢复）、RunEvent 持久化、SSE（Last-Event-ID 重连）、Cancel、Retry；
+Worker Crash 后 pending job 不永久丢失。
+
+### Architecture
+```
+POST /runs ──202──▶ Run 行 + run.created/queued 事件 ──▶ job stream
+                                                          │
+              repopilot:jobs（consumer group repopilot-workers）
+                                                          ▼
+                       worker（python -m mini_claude.worker.main）
+                          │  RunExecutor：plan → RunService（同一实现）
+                          │  event_sink/cancel_check 钩子 → DagRunner
+                          ▼
+              SQLite（run_events，Source of Truth）+ repopilot:events:{id}
+                                                          ▼
+                       GET /runs/{id}/events（SSE：SQLite 回放 + bus tail）
+```
+- `events/`：§7 RunEvent schema（固定事件词汇表）+ EventStore（SQLite 行级
+  持久化 + seq 回放）+ EventPublisher（先落库再推流；thread-safe sink
+  桥接 DagRunner 工作线程）。
+- `worker/`：RedisBus（XADD/XREADGROUP/XACK/XAUTOCLAIM 崩溃恢复/
+  dead-letter/心跳）+ InProcessBus（同契约，无 redis 的 dev 单进程模式，
+  label 如实）；CancelRegistry（redis 标记/进程内 event 双实现）；
+  RunExecutor（run_factory 测试缝）；consume_forever。
+- DagRunner 新增 event_sink/cancel_check（§45：task 边界检查，取消绝不
+  只是 UI 隐藏）；runtime 的 Phase 1 EventEmitter 直接映射为
+  agent/tool 事件（不解析终端日志）。
+- API：POST /runs（202）、GET /runs/{id}、cancel（cancelling→cancelled
+  状态机 + 409）、retry（original_run_id 链）、SSE。
+- 无 redis 时 API 内嵌 worker（dev 模式，启动时如实 warning）。
+
+### Added Files
+`events/{schema,store,publisher}.py`、`worker/{bus,cancel,executor,main}.py`、
+`api/routers/runs.py`、`tests/api/test_runs.py`（12 测试）
+venv 新增 redis 8.1.0；环境新增 redis-server 6.2.x（conda-forge
+用户态安装，classic solver——libmamba 配置损坏是真实障碍，如实记录）。
+
+### Modified Files
+`execution/runner.py`（事件/取消钩子）、`application/run.py` +
+`product/orchestrator.py`（透传）、`api/{main,config,schemas,errors}.py`、
+`persistence/{models,database}.py`
+
+### API Contract
+```
+POST /api/v1/repositories/{id}/runs {requirement, model?, jobs?, sandbox?, commit?}
+     → 202 {"run_id","status":"queued","bus":"redis|in-process"}
+GET  /api/v1/runs/{id}            （含 events 计数 + verification/diff/cost）
+POST /api/v1/runs/{id}/cancel     （queued→cancelled；running→cancelling→cancelled；终态 409）
+POST /api/v1/runs/{id}/retry      → 202（original_run_id 链）
+GET  /api/v1/runs/{id}/events     text/event-stream；Last-Event-ID 重连；终态自收
+```
+
+### Frontend Pages
+未涉及（WP9 Run Console 消费此流）。
+
+### Tests
+`tests/api/test_runs.py`：202→worker 消费→completed（脚本化 run 实现，
+管线真实）、事件类型全集合 + seq 严格递增、SSE 收帧 + 终态自收、
+运行中取消（cancelling→cancelled + 409）、排队取消终局（慢 run 占位
+确定性）、retry 链、未知 404；InProcessBus 契约；**真实 redis-server**
+（skipIf 无）：job 生命周期 + 崩溃恢复（XAUTOCLAIM）+ dead letter +
+事件 tail by seq；DagRunner 钩子真实 run（脚本化 LLM）发 task.started/
+verification.passed/task.completed。
+
+### Test Results
+```
+$ venv/bin/python -m pytest python/tests/api/ -q
+34 passed in 38.71s        # 22 + 12
+```
+
+### Screenshots
+真实端到端（真实 redis-server:6398 + 独立 uvicorn:8771 + 独立 worker
+进程 + 真实 DeepSeek，2026-09-12）：
+```
+POST /runs → 202 {"run_id":"1fb5af55...","status":"queued","bus":"redis"}
+SSE 实时流（16 事件）：run.created → run.queued → run.started →
+  plan.started/completed → task.started → verification.started/passed →
+  task.completed ×2 → file.changed ×2 → run.completed
+GET /runs/{id} → completed，verification 5/5 PASS，diff [calc.py,
+  test_calc.py]，cost $0.1003，96s；task/* 分支与 worktree 全部落盘
+RedisBus 真实验收：push/read/ack ✓；读而不 ack（模拟 worker 崩溃）→
+  新 worker XAUTOCLAIM 回收 ✓；dead-letter 保留 payload ✓
+```
+
+### Git Branch
+feat/web-phase-05-run-worker-events
+
+### Commits
+（本 Phase commit）
+
+### Push
+origin/feat/web-phase-05-run-worker-events
+
+### Integration
+合并 repopilot-dev。
+
+### Known Issues
+- 取消粒度 = task 边界（§45 要求 task/tool/repair 三边界；tool/repair
+  边界取消未接——如实记录，WP 后续如需要再补）。
+- SSE 在 RedisBus 下按 15s 阻塞读取（redis-py socket_timeout=None 修复
+  了真实发现的首验断流）；SQLite 会话在 SSE 循环内 expire_all 修复了
+  真实发现的 identity-map 陈旧状态。
+- redis-py 8.x xautoclaim 返回 [cursor, claims, deleted]（对真实 server
+  探测确认），与文档形状不同——代码注释锁定。
+- 本 Phase 在环境级安装 redis-server（conda-forge）；WP12 compose 会
+  固化部署形态。

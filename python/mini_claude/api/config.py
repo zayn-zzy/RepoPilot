@@ -16,6 +16,7 @@ class Settings:
     workspace_root: Path
     dev_mode: bool = False
     db_url: str = ""
+    redis_url: str = ""            # empty → in-process bus (dev mode)
     cors_origins: list[str] = field(default_factory=list)
 
     @classmethod
@@ -25,8 +26,10 @@ class Settings:
         dev = (env.get("REPOPILOT_DEV_MODE") or env.get("DEV_MODE") or "").lower() in (
             "1", "true", "yes")
         db_url = env.get("REPOPILOT_DB_URL") or str(root / ".repopilot" / "app.db")
+        redis_url = env.get("REPOPILOT_REDIS_URL") or ""
         origins = [o.strip() for o in
                    (env.get("REPOPILOT_CORS_ORIGINS") or
                     "http://localhost:5173").split(",") if o.strip()]
         return cls(workspace_root=root, dev_mode=dev,
-                   db_url=db_url, cors_origins=origins)
+                   db_url=db_url, redis_url=redis_url,
+                   cors_origins=origins)

@@ -229,6 +229,8 @@ async def run_dag_requirement(root: str | Path, requirement: str | Requirement, 
                               logger: RunLogger | None = None,
                               base_branch: str | None = None,
                               commit: bool = True,
+                              event_sink: Callable[[dict], None] | None = None,
+                              cancel_check: Callable[[], bool] | None = None,
                               ) -> "DagRunReport":
     """Phase 11 composition — run one requirement through its TaskDAG:
 
@@ -259,6 +261,7 @@ async def run_dag_requirement(root: str | Path, requirement: str | Requirement, 
         recorder_factory=lambda title, agent: RunRecorder(task=title,
                                                           agent=agent),
         logger=logger,
+        event_sink=event_sink, cancel_check=cancel_check,
     )
     report = await runner.run(requirement)
     if report.worktree is not None and report.diff is not None:
