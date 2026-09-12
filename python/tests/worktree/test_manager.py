@@ -395,6 +395,37 @@ class TestCleanup(unittest.TestCase):
         self.assertEqual(_git(self.repo, "branch", "--list", "task/T001"), "")
         self.assertEqual(self.mgr.list(), [])
 
+    def test_cleanup_merged_into_integration_branch(self):
+        """Phase 17: per-task branches merge into the INTEGRATION branch,
+        not the user's current branch — cleanup(merged_into=...) accepts
+        that, and refuses when the target does not contain the work."""
+        integration = self.mgr.create("RUN1")
+        wt = self.mgr.create("RUN1-T001", base_branch=integration.branch)
+        (wt.path / "a.py").write_text("def a():\n    return 100\n")
+        self.mgr.commit("RUN1-T001", "feat: task one")
+        self.mgr.merge("RUN1-T001", integration.branch, cwd=integration.path)
+
+        # Without a target, the check is against the current branch (main)
+        # — the integration-branch work is NOT there, so it refuses.
+        with self.assertRaises(WorktreeError):
+            self.mgr.cleanup("RUN1-T001")
+        # With the integration branch as the target it is preserved work.
+        self.mgr.cleanup("RUN1-T001", merged_into=integration.branch)
+        self.assertFalse(wt.path.exists())
+
+        # The integration branch itself is not in main: still refused.
+        with self.assertRaises(WorktreeError):
+            self.mgr.cleanup("RUN1", merged_into="main")
+        # But it is an ancestor of origin/<branch> once pushed there —
+        # work preserved on a remote counts as preserved.
+        origin = Path(self._tmp.name) / "origin.git"
+        origin.mkdir()
+        _git(origin, "init", "--bare", "-q")
+        _git(self.repo, "remote", "add", "origin", str(origin))
+        _git(self.repo, "push", "-q", "origin", integration.branch)
+        self.mgr.cleanup("RUN1", merged_into=f"origin/{integration.branch}")
+        self.assertFalse(integration.path.exists())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

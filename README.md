@@ -24,7 +24,7 @@ Runtime、仓库智能、混合检索、任务规划、多代理团队、Git Wor
 | Verification + Self-Repair（八阶段 fail-fast 管道/能力探测/≤3 次修复） | ✅ | `mini_claude/verify/` |
 | Docker Sandbox 安全策略（危险命令/密钥过滤/路径守卫/Runner） | ✅ 已接入实际命令执行（shell/tests/lint/验证，三态 auto/on/off，如实降级）；Docker 实机路径在本开发环境未验证（无 docker），见 DEVELOPMENT_RESULTS.md Phase 8/12 | `mini_claude/sandbox/` |
 | Evaluation + Benchmark（24 任务套件/四基线/消融/原始数据落盘） | ✅ | `mini_claude/evaluation/`、`tests/benchmark/phase9/` |
-| Productization（CLI/GitHub Issue→PR 流/§24 RunLog 可观测性） | ✅ | `mini_claude/product/` |
+| Productization（CLI/GitHub Issue→PR 流/§24 RunLog 可观测性） | ✅ `repopilot issue` 完整产品流（fetch → requirement → run → push → PR → 可选 merge/cleanup）；run 的 `--push/--pr/--merge/--cleanup` 逐步如实报告，失败的 run 绝不推送，worktree 清理绝不强删未保留的工作 | `mini_claude/product/` |
 | FastAPI / Trace Viewer | ❌ 未实现（文档标注为可选项） | — |
 
 ## 快速开始
@@ -65,13 +65,25 @@ repopilot benchmark
 管线全部经 `--sandbox` 三态沙箱执行）→ 失败则自修复（≤3 次）→ 提交 →
 按拓扑序合并进集成 worktree（冲突一律中止合并、绝不强写）→ 最终全量
 验证 → 生成六节 PR 描述（Summary/Changes/Reason/Tests/Risk/Files
-Changed）。GitHub PR 创建通过 `gh` CLI（未安装时给出可直接执行的命令）。
-主工作区全程不被切换或写入。
+Changed）。主工作区全程不被切换或写入。
+
+GitHub 流程（Phase 17，全部逐步如实报告，失败的 run 绝不推送）：
+
+```bash
+repopilot run --push --pr "修复 multiply bug"    # 成功后 push 分支 + gh pr create
+repopilot run --push --pr --merge --cleanup ...  # 再自动合并 PR + 清理 worktree
+repopilot issue owner/repo 7                     # Issue → Requirement → run → push → PR
+repopilot issue --json issue.json --merge --cleanup    # 离线 JSON 输入
+```
+
+PR 创建/合并通过 `gh` CLI（未安装/未登录时给出精确原因与可直接执行的手动
+命令，绝不假装成功）。cleanup 只移除已并入集成分支（任务 worktree）或已
+推送到远端（集成 worktree）的工作副本，从未合并/未推送的一律保留。
 
 ## 测试
 
 ```bash
-python -m pytest python/tests/ -q      # 当前 532/532
+python -m pytest python/tests/ -q      # 当前 545/545
 ```
 
 覆盖：单元/集成/E2E（E2E = 脚本化 LLM 驱动真实 Agent 循环走完整

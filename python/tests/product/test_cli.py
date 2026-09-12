@@ -153,6 +153,48 @@ class TestCli(unittest.TestCase):
         os.environ.pop("ANTHROPIC_BASE_URL")
         self.assertIsNone(_llm_base_url())
 
+    def test_issue_without_gh_fails_explicitly(self):
+        # a `gh` that cannot even report its version — the honest path
+        bin_dir = Path(self._tmp.name) / "bin"
+        bin_dir.mkdir()
+        (bin_dir / "gh").write_text("#!/bin/bash\nexit 127\n")
+        (bin_dir / "gh").chmod(0o755)
+        p = _run(self.repo, "issue", "o/r", "7",
+                 env={"PATH": f"{bin_dir}:{os.environ['PATH']}"})
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("not installed", p.stderr)
+
+    def test_issue_fetches_parses_and_fails_honestly_without_key(self):
+        bin_dir = Path(self._tmp.name) / "bin"
+        bin_dir.mkdir()
+        (bin_dir / "gh").write_text(
+            "#!/bin/bash\n"
+            'if [ "$1" = "--version" ]; then exit 0; fi\n'
+            'echo \'{"number": 7, "title": "multiply bug", '
+            '"body": "in calc.py multiply() returns a+b instead of a*b", '
+            '"state": "open"}\'\n')
+        (bin_dir / "gh").chmod(0o755)
+        p = _run(self.repo, "issue", "o/r", "7",
+                 env={"PATH": f"{bin_dir}:{os.environ['PATH']}"})
+        self.assertEqual(p.returncode, 1)      # the run needs a real LLM key
+        self.assertIn("issue #7: multiply bug", p.stdout)
+        self.assertIn("ANTHROPIC_API_KEY", p.stderr)
+
+    def test_issue_json_offline_parses_without_gh(self):
+        issue_file = Path(self._tmp.name) / "issue.json"
+        issue_file.write_text(json.dumps(
+            {"number": 9, "title": "offline issue",
+             "body": "fix calc.py multiply", "state": "open"}))
+        p = _run(self.repo, "issue", "--json", str(issue_file))
+        self.assertEqual(p.returncode, 1)      # same key gate
+        self.assertIn("issue #9: offline issue", p.stdout)
+        self.assertIn("ANTHROPIC_API_KEY", p.stderr)
+
+    def test_issue_needs_repo_and_number_without_json(self):
+        p = _run(self.repo, "issue")
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("OWNER/REPO and NUMBER", p.stderr)
+
     def test_benchmark_runs_real_retrieval_and_saves_raw(self):
         p = _run(self.repo, "benchmark", "--out",
                  str(self.repo / ".repopilot" / "bench"))

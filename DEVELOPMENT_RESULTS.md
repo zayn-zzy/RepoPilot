@@ -2812,3 +2812,100 @@ $ repopilot run --sandbox off "修复 multiply() 把乘法写成加法的 bug"  
 - LSA 栈每次 ask 重新 fit（修复 bug 的代价；LSA 是确定性回退，
   fit 即其构建成本），逐文件缓存只服务神经后端。
 - 旧版 embeddings-cache.json（Phase 14/15）仍可复用（全库未变时）。
+
+---
+
+## Phase 17：GitHub 流程产品化（issue 命令 + push/PR/merge/cleanup）
+
+用户评审差距 #7："GitHub 流程没有完全产品化——没有 issue 命令，
+没有自动 merge/push/PR/cleanup"。本 Phase 补齐文档定义的完整链路：
+GitHub Issue → Requirement → Run → Patch → Commit → Push → PR →
+（可选）Merge →（可选）Cleanup。
+
+### 17.1 实现
+
+- 新增 `product/github_flow.py`：`run_github_flow(root, report, push, pr,
+  merge, cleanup, merge_method, gh_bin, manager)` —— run 之后的完整产品流，
+  `GithubResult` 逐步记录每一步的真相：
+  - `parse_remote_repo`：origin URL → owner/repo（https/git@/ssh 三种形式，
+    无 remote/不可解析时精确报错）；
+  - `push_branch`：真实 `git push -u origin <branch>`，失败带原始 stderr；
+  - PR 创建复用 Phase 10 的 `create_pull_request`（gh），从 URL 解析 PR 号；
+  - `merge_pr`：`gh pr merge <n> --merge|--squash [--delete-branch]`；
+  - **失败的 run 绝不推送**（broken code 不出机器），每一步失败都跳过
+    下游并说明原因，绝不假装成功。
+- cleanup 安全语义（`WorktreeManager.cleanup(merged_into=)`）：
+  - 任务 worktree：分支已并入集成分支才移除（失败任务的未合并工作保留）；
+  - 集成 worktree：分支已推送到远端才移除（origin/<branch> 存在且
+    本地是其后代的 ancestor 判定——远端有副本即视为工作已保留）；
+  - 一律不 force；被拒绝的逐条报告原因。分支删除同样按目标验证
+    （git branch -d 只认 HEAD/upstream，已验证 merged_into 的改用普通
+    删除——检查先于删除，绝不丢工作）。
+- CLI：
+  - `repopilot run --push/--pr/--merge/--cleanup/--squash`（默认全部关闭，
+    行为向后兼容——PR body + 手动 gh 命令照旧）；
+  - `repopilot issue OWNER/REPO NUMBER [--json file] [--no-push] [--no-pr]
+    [--merge] [--cleanup] [--squash]`：gh 取 issue → issue_to_requirement
+    （Phase 10 的 prose 文件提及提取）→ 与 run 相同的规划/DAG 执行 →
+    push+PR 默认开启。
+- `github.py`：`_gh_available/fetch_issue/create_pull_request` 接受
+  `gh_bin` 注入（测试用假 gh）；subprocess 的 OSError 统一转为 GhError
+  ——真实发现：本机 PATH 里 /home/why/miniconda3 不可遍历，执行不存在的
+  `gh` 返回 Permission denied 而不是 FileNotFoundError，修复前整个
+  issue 命令崩成 "repopilot: error: [Errno 13]"；修复后如实提示
+  "the GitHub CLI (gh) is not installed or not authenticated"。
+
+### 17.2 测试（+13，545/545）
+
+- `tests/product/test_github_flow.py`（8）：远程 URL 三形式解析/无 remote
+  显式报错、真实 push 到达裸远端、PR 号解析、merge argv 与诚实失败
+  （假 gh 记录 argv）、失败 run 绝不推送、无 origin 显式报错，以及
+  **E2E**：真实 DagRunner（脚本化 LLM 修 multiply()，真实 pytest 验证）
+  → push 到真实裸远端 → 假 gh 创建/合并 PR（断言 argv 与 PR 号）→
+  cleanup 移除全部三个 worktree（per-task 已并入集成、集成已推送）→
+  远端分支含修复内容、主工作区字节不变。
+- `tests/worktree/test_manager.py`（1）：merged_into 语义——对主分支
+  未合并仍拒绝；对集成分支可清；对 origin/<branch> 可清。
+- `tests/product/test_cli.py`（4）：issue 无 gh 显式失败（PATH 注入
+  假 gh）、issue 经假 gh 解析后卡在 key 检查（输出 "issue #7: ..."）、
+  --json 离线解析、缺 repo/number 的报错。
+
+```
+$ venv/bin/python -m pytest python/tests/ -q
+545 passed in 451.55s     # 532 + 13
+```
+
+### 17.3 真实验收（真实 DeepSeek 运行 + 本地裸远端；本机无 gh）
+
+```
+$ repopilot run --sandbox off --push --pr --cleanup "修复 multiply() 把乘法写成加法的 bug"
+  run T94370: SUCCESS (2 task(s): succeeded=2)
+    - T-B-1 [coder]  succeeded commit=89bc1be890c9 tests 2/2 $0.0148
+    - T-B-2 [tester] succeeded commit=fbb79f98bbc7 tests 3/3 $0.0714
+  final verification: PASS 3/3 tests
+  github:
+    repo: gh-accept2/origin
+    push: ok — Branch 'task/T94370' set up to track remote branch 'task/T94370' from 'origin'.
+    PR: not created — the GitHub CLI (gh) is not installed or not authenticated — ...
+      gh pr create --repo ... --head task/T94370 --base main --title ... --body-file <file>
+    cleanup: removed worktree(s) T94370-T-B-1, T94370-T-B-2, T94370
+
+$ git --git-dir origin.git branch --list   → task/T94370（真实推送到达）
+$ git --git-dir origin.git show task/T94370:calc.py   → return a * b（修复内容）
+$ ls repo/worktrees/ → 空；git branch --list 'task/*' → 空；主工作区 clean
+
+$ repopilot issue o/r 7      # 本机无 gh
+  error: the GitHub CLI (gh) is not installed or not authenticated — install it
+  and run `gh auth login`, or pass the issue JSON directly to issue_to_requirement()
+```
+
+### 17.4 如实注记
+
+- 本机未安装 gh，PR 创建/合并实机路径 UNVERIFIED——argv/输出有假 gh
+  单测 + E2E 锁定；push/cleanup/分支对账均为真实 git 操作实机验证。
+- 本机 PATH 有不可遍历目录导致 exec 不存在的 gh 报 Permission denied
+  （而非 FileNotFoundError）——已如实处理（17.1），issue 命令不再崩溃。
+- issue --json 的完整真实运行（真实 DeepSeek key，I9-T94095）与本阶段
+  run 在同一仓库并行执行：两个 run 各自创建 worktree、各自产生
+  files-changed diff 与 PR body，互不干扰（Phase 6 worktree 隔离的
+  实机佐证）；该运行最终一行未捕获（scratch 已删），不作成功断言。
