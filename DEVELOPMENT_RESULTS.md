@@ -3212,3 +3212,81 @@ origin/feat/web-phase-03-repository-api
 ### Known Issues
 - 逻辑删除的记录保留在库中（同路径重新注册会复活原记录——测试锁定）。
 - initialize 端点幂等（重复调用重写 config.json）。
+
+---
+
+# Web Phase 4：Ask + Plan API
+
+### Goal
+规约 §32：POST ask / POST plan / GET plan，返回结构化 retrieval
+evidence 与 plan nodes/edges + 元数据——禁止把终端字符串包成 JSON。
+
+### Architecture
+```
+api/routers/ask.py（AskService 直调：hits 含 per-source 分数与 backend
+  label；answer 可选，key 从服务器 env 读取）
+api/routers/plans.py（PlanningService → Plan 表持久化 nodes/edges JSON）
+persistence/models.py +Plan 表
+```
+Plan 行存 nodes_json/edges_json（TaskNode 全字段）；GET 读结构化行。
+
+### Added Files
+- `api/routers/ask.py`、`api/routers/plans.py`
+- `python/tests/api/test_ask_plan.py`（5 测试）
+
+### Modified Files
+- `api/schemas.py`（+Ask/Plan DTO）、`api/main.py`（挂载两 router）、
+  `persistence/models.py`（+Plan）
+
+### API Contract
+```
+POST /api/v1/repositories/{id}/ask    {question, model?, semantic?, answer?}
+     → AskOut{question, semantic_label, semantic_note, context,
+              hits:[{file_path, score, sources}], answer, has_answer}
+POST /api/v1/repositories/{id}/plans  {requirement, model?, llm?} → 201 PlanOut
+GET  /api/v1/plans/{plan_id}          → PlanOut（nodes/edges 结构化）
+```
+
+### Frontend Pages
+未涉及（WP8）。
+
+### Tests
+`tests/api/test_ask_plan.py`：结构化 evidence（字段集+sources 含 semantic）、
+无 key 诚实 has_answer=false、plan 创建/回读一致（nodes 字段集与边引用）、
+llm 无 key → API_KEY_REQUIRED（测试隔离 env——真实发现：本机 ambient env
+带真实 key，不隔离会真的调 DeepSeek）、未知 plan 404、未知 repo 404。
+
+### Test Results
+```
+$ venv/bin/python -m pytest python/tests/api/ -q
+22 passed in 8.64s        # 17 + 5
+```
+
+### Screenshots
+真实 uvicorn + curl（2026-09-12）：
+```
+POST /plans {"requirement":"修复 multiply 的 bug"}
+  → 201 plan id=066107ac... planner=deterministic nodes=2 edges=1
+    node0: T-B-1 [coder] Fix the bug
+GET  /plans/{id} → 3 nodes 结构化回读 ✓
+POST /ask {"question":"multiply 在哪里定义","semantic":"lsa","answer":false}
+  → hits: calc.py 1.8 [lexical, semantic] / stats.py 0.648 [semantic]
+POST /ask（answer:true，真实 DeepSeek）
+  → has_answer=true："`multiply` 定义在 `calc.py` 中（`def m..."
+```
+
+### Git Branch
+feat/web-phase-04-plan-ask-api
+
+### Commits
+（本 Phase commit）
+
+### Push
+origin/feat/web-phase-04-plan-ask-api
+
+### Integration
+合并 repopilot-dev。
+
+### Known Issues
+- ask 的 LLM answer 使用服务器 env 的 key（与 CLI 同源）；无 key 时
+  has_answer=false 且不报错（诚实降级为纯检索）。

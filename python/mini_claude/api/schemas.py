@@ -54,3 +54,45 @@ class IndexStatusOut(BaseModel):
     symbols: int = 0
     imports: int = 0
     references: int = 0
+
+
+class AskRequest(BaseModel):
+    question: str
+    model: str = "deepseek-v4-pro[1m]"
+    semantic: str = "auto"      # auto | local | api | lsa
+    answer: bool = True
+
+
+class AskHitOut(BaseModel):
+    file_path: str
+    score: float
+    sources: dict = {}
+
+
+class AskOut(BaseModel):
+    question: str
+    semantic_label: str
+    semantic_note: str
+    context: str
+    hits: list[AskHitOut] = []
+    answer: str = ""
+    has_answer: bool = False
+
+
+class PlanCreateRequest(BaseModel):
+    requirement: str
+    model: str = "deepseek-v4-pro[1m]"
+    llm: bool = False
+
+
+class PlanOut(BaseModel):
+    id: str
+    repository_id: str | None = None
+    requirement_title: str
+    requirement_kind: str
+    requirement_description: str
+    model: str
+    planner: str
+    nodes: list[dict] = []
+    edges: list[dict] = []
+    created_at: str | None = None

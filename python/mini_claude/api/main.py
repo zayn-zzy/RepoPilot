@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from .config import Settings, VERSION
 from .errors import register_error_handlers
 from .middleware import RequestIdMiddleware, install_cors
-from .routers import health, repositories
+from .routers import ask, health, plans, repositories
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -48,6 +48,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_error_handlers(app)
     app.include_router(health.router)
     app.include_router(repositories.router)
+    app.include_router(ask.router)
+    app.include_router(plans.router)
     return app
 
 
