@@ -2917,3 +2917,56 @@ $ repopilot issue o/r 7      # 本机无 gh
   run 在同一仓库并行执行：两个 run 各自创建 worktree、各自产生
   files-changed diff 与 PR body，互不干扰（Phase 6 worktree 隔离的
   实机佐证）；该运行最终一行未捕获（scratch 已删），不作成功断言。
+
+---
+
+# Web Phase 0：现状审计
+
+### Goal
+按《RepoPilot Web 产品化全栈开发执行规约》§28：审计现状、追踪 CLI 调用链、
+区分已实现与设计、形成 Web 化 Baseline，明确每个 CLI 命令的无损迁移路径。
+
+### Architecture
+无代码改动。产出 `docs/web/web-baseline-audit.md`（命令 → Entry → Core
+Module → Input → Output → Persistence → Web Service Candidate 全表）。
+
+### Added Files
+- `docs/web/web-baseline-audit.md`
+
+### Modified Files
+- 无（审计仅文档）
+
+### API Contract
+未涉及（WP2 起）。
+
+### Frontend Pages
+未涉及（WP7 起）。
+
+### Tests
+无新增测试（无代码改动）；全量回归维持 545/545（WP0 基准）。
+
+### Test Results
+真实 CLI Smoke（2026-09-12）：index（loaded + re-parsed 9 → saved）、
+graph（218 files, modules 354 edges 977）、plan（确定性 3-task DAG）。
+
+### Screenshots
+无（CLI 阶段）。
+
+### Git Branch
+feat/web-phase-00-audit
+
+### Commits
+（本 Phase commit）
+
+### Push
+origin/feat/web-phase-00-audit
+
+### Integration
+合并 repopilot-dev（commit-tree，工作区保持用户文件原样）。
+
+### Known Issues
+- 环境无 node/npm/redis-server/docker、无 sudo——WP2/5/7 前需用户态安装
+  （pypi 直装、conda-forge redis、node tarball），docker 实机路径预期
+  UNVERIFIED。
+- 取消机制、approval 等待、行级 run 持久化、事件级 tool_call 落库为
+  明确缺口（审计 §3.5），对应 WP5/6 补齐。
