@@ -45,5 +45,7 @@ def ping(db_url: str) -> bool:
 
 
 def init_schema(db_url: str) -> None:
-    """Create all Web tables (idempotent)."""
+    """Create all Web tables (idempotent). Imports the models at call
+    time so create_all sees every table (avoids a module cycle)."""
+    from . import models  # noqa: F401
     Base.metadata.create_all(engine_for(db_url))

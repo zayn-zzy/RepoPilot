@@ -3129,3 +3129,86 @@ origin/feat/web-phase-02-api-foundation
 - fastapi/uvicorn/sqlalchemy 已入 venv（本 Phase 依赖）；pytest-asyncio
   按 WP5 需要时再装。
 - uvicorn 实机验证仅本机 localhost；生产部署形态在 WP12 compose。
+
+---
+
+# Web Phase 3：Repository API
+
+### Goal
+规约 §31：Repository 的 Create/List/Detail/Initialize/Index/Index Status/
+逻辑删除，REPOPILOT_WORKSPACE_ROOT 安全边界；测试矩阵：valid repo、
+invalid repo、outside root、path traversal、index、reindex。
+
+### Architecture
+```
+persistence/models.py（Repository 表：owner_id 自始保留 §20，逻辑删除）
+application/registry.py（RepositoryRegistry：workspace 边界校验——
+resolve 跟随 symlink，越界/穿越一律 PATH_OUTSIDE_WORKSPACE）
+api/routers/repositories.py（7 个端点，§11 envelope）
+```
+索引端点复用 RepositoryService（同一 Use Case，无第二实现）。
+
+### Added Files
+- `python/mini_claude/persistence/models.py`、`python/mini_claude/application/registry.py`
+- `python/mini_claude/api/routers/repositories.py`、`api/schemas.py`
+- `python/tests/api/test_repositories.py`（8 测试）
+
+### Modified Files
+- `api/main.py`（挂载 repositories router）、`api/errors.py`（+2 状态映射）、
+  `persistence/database.py`（init_schema 载入 models）、
+  `application/__init__.py`（导出 registry）
+
+### API Contract
+```
+POST   /api/v1/repositories            201（path 须在 workspace 内且为 git repo）
+GET    /api/v1/repositories            列表（含 index 摘要字段）
+GET    /api/v1/repositories/{id}       详情
+DELETE /api/v1/repositories/{id}       逻辑删除（文件不动，列表/详情 404）
+POST   /api/v1/repositories/{id}/initialize
+POST   /api/v1/repositories/{id}/index     {full?: bool}
+GET    /api/v1/repositories/{id}/index     IndexStatus（db 元数据+行计数）
+```
+
+### Frontend Pages
+未涉及（WP8）。
+
+### Tests
+`tests/api/test_repositories.py`：注册/列表/详情、非 git → 400
+NOT_A_GIT_REPOSITORY、workspace 外 → 400、`..` 穿越 → 400、重复路径 →
+409、initialize+index+reindex（up to date）+status+记录字段落库、
+逻辑删除（404 + 磁盘文件不动）、未知 id → 404。
+
+### Test Results
+```
+$ venv/bin/python -m pytest python/tests/api/ -q
+17 passed in 2.65s        # WP2 的 9 + 本 Phase 8
+```
+
+### Screenshots
+真实 uvicorn + curl（2026-09-12，/tmp/wp3 真实 workspace）：
+```
+POST /api/v1/repositories {"path":"/tmp/wp3/workspace/calc"}
+  → 201 {"data":{"id":"f6c34f08...","name":"calc",...}}
+POST {"path":"/tmp"} → 400 PATH_OUTSIDE_WORKSPACE（安全边界真实生效）
+POST /initialize → ok=true + config 落盘
+POST /index       → files=2 symbols=3 imports=1 references=2（fresh, saved）
+POST /index(二次) → "loaded ... — up to date"（索引复用）
+GET  /index       → exists=true size_bytes=61440 files=2 ...
+GET  /detail      → index_files=2 index_symbols=3 last_indexed_at=...
+```
+
+### Git Branch
+feat/web-phase-03-repository-api
+
+### Commits
+（本 Phase commit）
+
+### Push
+origin/feat/web-phase-03-repository-api
+
+### Integration
+合并 repopilot-dev。
+
+### Known Issues
+- 逻辑删除的记录保留在库中（同路径重新注册会复活原记录——测试锁定）。
+- initialize 端点幂等（重复调用重写 config.json）。
