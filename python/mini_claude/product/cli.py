@@ -5,6 +5,7 @@
     repopilot ask         answer a question with retrieval + LLM context
     repopilot plan        parse a requirement and produce a plan
     repopilot run         run a requirement through its task DAG in parallel worktrees
+    repopilot issue       run a GitHub issue through the full flow (run + push + PR)
     repopilot graph       print the dependency graph
     repopilot benchmark   run the Phase 9 evaluation (retrieval by default)
 
@@ -113,6 +114,47 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--model", default="deepseek-v4-pro[1m]")
     p_run.add_argument("--no-commit", action="store_true",
                        help="do not commit or merge the task changes")
+    p_run.add_argument("--push", action="store_true",
+                       help="push the task branch to origin after a "
+                            "successful run")
+    p_run.add_argument("--pr", action="store_true",
+                       help="create a GitHub PR via gh (implies --push)")
+    p_run.add_argument("--merge", action="store_true",
+                       help="merge the created PR via gh (implies --pr)")
+    p_run.add_argument("--squash", action="store_true",
+                       help="merge method: squash (with --merge)")
+    p_run.add_argument("--cleanup", action="store_true",
+                       help="remove run worktrees whose work is merged/"
+                            "pushed — never by force")
+
+    p_issue = sub.add_parser(
+        "issue", help="run a GitHub issue through the full flow: "
+                      "fetch → requirement → run → push → PR")
+    p_issue.add_argument("repo", nargs="?",
+                         help="OWNER/REPO of the issue (needed without --json)")
+    p_issue.add_argument("number", nargs="?", type=int,
+                         help="issue number (needed without --json)")
+    p_issue.add_argument("--json", default=None,
+                         help="issue JSON file instead of `gh` (offline)")
+    p_issue.add_argument("--dir", default=".", help="repository root")
+    p_issue.add_argument("--llm", action="store_true",
+                         help="build the task DAG with the LLM planner")
+    p_issue.add_argument("--model", default="deepseek-v4-pro[1m]")
+    p_issue.add_argument("--jobs", type=int, default=2,
+                         help="max parallel task worktrees (default: 2)")
+    p_issue.add_argument("--sandbox", choices=("auto", "on", "off"),
+                         default="auto", help="command sandbox mode")
+    p_issue.add_argument("--no-push", action="store_true",
+                         help="skip the git push (default: push)")
+    p_issue.add_argument("--no-pr", action="store_true",
+                         help="skip PR creation (default: create)")
+    p_issue.add_argument("--merge", action="store_true",
+                         help="merge the PR after creation via gh")
+    p_issue.add_argument("--squash", action="store_true",
+                         help="merge method: squash (with --merge)")
+    p_issue.add_argument("--cleanup", action="store_true",
+                         help="remove run worktrees whose work is merged/"
+                              "pushed — never by force")
 
     p_graph = sub.add_parser("graph", help="print the dependency graph")
     p_graph.add_argument("dir", nargs="?", default=".")
@@ -137,6 +179,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_plan(args)
         if args.command == "run":
             return _cmd_run(args)
+        if args.command == "issue":
+            return _cmd_issue(args)
         if args.command == "graph":
             return _cmd_graph(args)
         if args.command == "benchmark":
@@ -304,42 +348,122 @@ def _cmd_plan(args) -> int:
     return 0
 
 
-def _cmd_run(args) -> int:
-    from ..planning import Planner, RequirementParser
-    from ..product.orchestrator import run_dag_requirement
-    root = Path(args.dir).resolve()
-    _require_git(root)
-    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
-    if not api_key:
-        print("error: repopilot run needs ANTHROPIC_API_KEY "
+def _require_key(what: str) -> str | None:
+    """The API key or an honest failure (run/issue need a real LLM)."""
+    key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
+    if not key:
+        print(f"error: repopilot {what} needs ANTHROPIC_API_KEY "
               "(or ANTHROPIC_AUTH_TOKEN)", file=sys.stderr)
-        return 1
-    requirement = RequirementParser().parse(args.requirement)
-    print(f"requirement: {requirement.title} (kind={requirement.kind.value})")
+    return key
+
+
+def _make_plan(args, requirement) -> object:
+    """Deterministic or LLM planner — the shared run/issue step."""
     import asyncio
+    from ..planning import Planner
+    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
     if args.llm:
         planner = Planner(llm_call=_make_llm_call(api_key, args.model))
-        plan = asyncio.run(planner.plan_with_llm(requirement))
-    else:
-        plan = Planner()._deterministic_plan(requirement)
+        return asyncio.run(planner.plan_with_llm(requirement))
+    return Planner()._deterministic_plan(requirement)
+
+
+def _run_planned(root: Path, requirement, args, task_id: str, api_key: str):
+    """Shared run/issue execution: plan → DAG run → report."""
+    import asyncio
+    from ..product.orchestrator import run_dag_requirement
+    plan = _make_plan(args, requirement)
     _print_plan(plan)
-    task_id = args.task_id or f"T{int(time.time()) % 100000}"
     report = asyncio.run(run_dag_requirement(
         root, requirement, plan=plan, task_id=task_id,
         model=args.model, api_key=api_key,
         anthropic_base_url=_llm_base_url(),
         jobs=args.jobs, sandbox=args.sandbox,
-        commit=not args.no_commit,
+        commit=not getattr(args, "no_commit", False),
     ))
     print(report.summarize())
+    return report
+
+
+def _finish_run(root: Path, report, task_id: str, *, push: bool, pr: bool,
+                merge: bool, cleanup: bool, squash: bool) -> int:
+    """The Phase 17 GitHub flow + PR body handling. Without any GitHub
+    flag the behavior is unchanged: PR body written, manual `gh pr
+    create` command printed."""
+    pr_file = None
     if report.pr is not None:
         pr_file = _repopilot_dir(root) / f"pr-{task_id}.md"
         pr_file.write_text(report.pr.body)
+    requested = push or pr or merge or cleanup
+    pr_url = ""
+    if requested:
+        from ..product.github_flow import run_github_flow
+        from ..worktree import WorktreeManager
+        result = run_github_flow(
+            root, report, push=push, pr=pr, merge=merge, cleanup=cleanup,
+            merge_method="squash" if squash else "merge",
+            manager=WorktreeManager(root))
+        print(result.summarize())
+        pr_url = result.pr_url
+    if report.pr is not None and not pr_url:
         print(f"  PR body: {pr_file}")
         print(f"  create it with: gh pr create --head {report.pr.head_branch} "
               f"--base {report.pr.base_branch} --title \"{report.pr.title}\" "
               f"--body-file {pr_file}")
     return 0 if report.success else 1
+
+
+def _cmd_run(args) -> int:
+    from ..planning import RequirementParser
+    root = Path(args.dir).resolve()
+    _require_git(root)
+    api_key = _require_key("run")
+    if api_key is None:
+        return 1
+    requirement = RequirementParser().parse(args.requirement)
+    print(f"requirement: {requirement.title} (kind={requirement.kind.value})")
+    task_id = args.task_id or f"T{int(time.time()) % 100000}"
+    report = _run_planned(root, requirement, args, task_id, api_key)
+    return _finish_run(root, report, task_id, push=args.push, pr=args.pr,
+                       merge=args.merge, cleanup=args.cleanup,
+                       squash=args.squash)
+
+
+def _cmd_issue(args) -> int:
+    """GitHub Issue → Requirement → Run → Push → PR — the doc's full
+    flow. `gh` fetches the issue (or --json supplies it offline); push
+    and PR creation default ON, merge/cleanup are opt-in flags."""
+    from ..planning import RequirementParser
+    from ..product.github import GhError, fetch_issue, issue_to_requirement
+    root = Path(args.dir).resolve()
+    _require_git(root)
+    if args.json:
+        try:
+            issue = json.loads(Path(args.json).read_text())
+        except OSError as e:
+            print(f"error: cannot read issue JSON: {e}", file=sys.stderr)
+            return 1
+    else:
+        if not args.repo or not args.number:
+            print("error: repopilot issue needs OWNER/REPO and NUMBER "
+                  "(or --json issue.json)", file=sys.stderr)
+            return 1
+        try:
+            issue = fetch_issue(args.repo, args.number)
+        except GhError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+    requirement = issue_to_requirement(issue)
+    print(f"issue #{issue.get('number', '?')}: {requirement.title} "
+          f"(kind={requirement.kind.value})")
+    api_key = _require_key("issue")
+    if api_key is None:
+        return 1
+    task_id = f"I{issue.get('number', 'X')}-T{int(time.time()) % 100000}"
+    report = _run_planned(root, requirement, args, task_id, api_key)
+    return _finish_run(root, report, task_id, push=not args.no_push,
+                       pr=not args.no_pr, merge=args.merge,
+                       cleanup=args.cleanup, squash=args.squash)
 
 
 def _cmd_graph(args) -> int:

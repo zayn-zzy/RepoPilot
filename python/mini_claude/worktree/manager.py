@@ -398,15 +398,24 @@ class WorktreeManager:
 
     # ─── cleanup ────────────────────────────────────────────────
 
-    def cleanup(self, task_id: str, *, force: bool = False) -> None:
+    def cleanup(self, task_id: str, *, force: bool = False,
+                merged_into: str | None = None) -> None:
         """Remove the task's worktree and branch.
 
         Never destructive by default: a dirty worktree (uncommitted
         changes would be lost) or a branch with commits not merged into
-        the main workspace's HEAD blocks cleanup and raises — passing
+        the target branch blocks cleanup and raises — passing
         ``force=True`` explicitly discards either. The unmerged-branch
-        check runs first so a refused cleanup leaves everything intact."""
+        check runs first so a refused cleanup leaves everything intact.
+
+        ``merged_into`` names the branch the work is expected to be
+        merged into (default: the main workspace's current branch). The
+        GitHub flow (Phase 17) passes the integration branch for
+        per-task worktrees and ``origin/<integration branch>`` for the
+        integration worktree once it is pushed — work preserved on the
+        remote counts as preserved."""
         info = self.get(task_id)
+        target = merged_into or self._current_branch()
         if info.path.exists():
             if not force:
                 out = self._git(["status", "--porcelain"], info.path)
@@ -415,10 +424,10 @@ class WorktreeManager:
                         f"worktree for task {task_id!r} has uncommitted changes; "
                         f"cleanup refused (pass force=True to discard them):\n{out[:800]}")
             if self._git_ok(["rev-parse", "--verify", "--quiet", info.branch], self.root):
-                if not force and not self._branch_merged_into_head(info.branch):
+                if not force and not self._branch_merged_into(info.branch, target):
                     raise WorktreeError(
                         f"branch {info.branch} has commits not merged into "
-                        f"{self._current_branch()!r}; cleanup refused "
+                        f"{target!r}; cleanup refused "
                         "(pass force=True to delete it anyway)")
             p = self._run(["worktree", "remove"] +
                           (["--force"] if force else []) + [str(info.path)], self.root)
@@ -426,11 +435,27 @@ class WorktreeManager:
                 raise WorktreeError(
                     f"failed to remove worktree for task {task_id!r}: {p.stderr.strip()}")
         if self._git_ok(["rev-parse", "--verify", "--quiet", info.branch], self.root):
-            p = self._run(["branch", "-D" if force else "-d", info.branch], self.root)
+            # `git branch -d` only checks HEAD/upstream; a merged_into
+            # target was already verified by merge-base --is-ancestor
+            # above, so a plain delete is safe there (nothing unmerged
+            # is ever discarded — the check ran first).
+            flag = "-D" if (force or merged_into is not None) else "-d"
+            p = self._run(["branch", flag, info.branch], self.root)
             if p.returncode != 0:
                 raise WorktreeError(
                     f"failed to delete branch {info.branch}: {p.stderr.strip()}")
         self._delete_meta(task_id)
+
+    def _branch_merged_into(self, branch: str, target: str | None = None) -> bool:
+        """Is every commit of ``branch`` reachable from ``target``?
+        With no target, the main workspace's current branch (the legacy
+        `git branch --merged` listing)."""
+        if target is None:
+            listed = self._git(["branch", "--merged"], self.root)
+            return any(line.strip().lstrip("*+ ") == branch
+                       for line in listed.splitlines())
+        return self._git_ok(["merge-base", "--is-ancestor", branch, target],
+                            self.root)
 
     def cleanup_all(self, *, force: bool = False) -> list[str]:
         """Clean up every registered task; returns the removed task ids.
@@ -440,9 +465,3 @@ class WorktreeManager:
             self.cleanup(info.task_id, force=force)
             removed.append(info.task_id)
         return removed
-
-    def _branch_merged_into_head(self, branch: str) -> bool:
-        # `git branch --merged` prefixes the current branch with '*' and
-        # branches checked out in linked worktrees with '+'.
-        listed = self._git(["branch", "--merged"], self.root)
-        return any(line.strip().lstrip("*+ ") == branch for line in listed.splitlines())

@@ -116,45 +116,61 @@ class GhError(RuntimeError):
     """GitHub integration is unavailable — the message says exactly why."""
 
 
-def fetch_issue(repo: str, number: int) -> dict:
+def fetch_issue(repo: str, number: int, *, gh_bin: str | None = None) -> dict:
     """Fetch one GitHub issue via `gh` (JSON). Raises GhError with a
-    precise reason when gh is missing or the fetch fails."""
-    if not _gh_available():
+    precise reason when gh is missing or the fetch fails.
+
+    ``gh_bin`` injects the gh executable (tests use a fake script; the
+    product uses the real ``gh``)."""
+    gh = gh_bin or "gh"
+    if not _gh_available(gh_bin=gh_bin):
         raise GhError(
             "the GitHub CLI (gh) is not installed or not authenticated — "
             "install it and run `gh auth login`, or pass the issue JSON "
             "directly to issue_to_requirement()")
-    p = subprocess.run(
-        ["gh", "issue", "view", str(number), "--repo", repo, "--json",
-         "title,body,number,state"],
-        capture_output=True, text=True, timeout=60)
+    try:
+        p = subprocess.run(
+            [gh, "issue", "view", str(number), "--repo", repo, "--json",
+             "title,body,number,state"],
+            capture_output=True, text=True, timeout=60)
+    except OSError as e:
+        raise GhError(f"gh could not be executed: {e}") from e
     if p.returncode != 0:
         raise GhError(f"gh issue view failed: {p.stderr.strip()}")
     return json.loads(p.stdout)
 
 
 def create_pull_request(info: PrInfo, repo: str, *,
-                        labels: list[str] | None = None) -> str:
+                        labels: list[str] | None = None,
+                        gh_bin: str | None = None) -> str:
     """Create the PR via `gh`. Returns the PR URL on success; raises
-    GhError otherwise."""
-    if not _gh_available():
+    GhError otherwise. ``gh_bin`` injects the gh executable (tests)."""
+    gh = gh_bin or "gh"
+    if not _gh_available(gh_bin=gh_bin):
         raise GhError(
             "the GitHub CLI (gh) is not installed or not authenticated — "
             f"the PR body is ready; create it manually with:\n"
             f"  gh pr create --repo {repo} --head {info.head_branch} "
             f"--base {info.base_branch} --title \"{info.title}\" --body-file <file>")
-    argv = ["gh", "pr", "create", "--repo", repo,
+    argv = [gh, "pr", "create", "--repo", repo,
             "--head", info.head_branch, "--base", info.base_branch,
             "--title", info.title, "--body", info.body]
     for label in labels or []:
         argv += ["--label", label]
-    p = subprocess.run(argv, capture_output=True, text=True, timeout=120)
+    try:
+        p = subprocess.run(argv, capture_output=True, text=True, timeout=120)
+    except OSError as e:
+        raise GhError(f"gh could not be executed: {e}") from e
     if p.returncode != 0:
         raise GhError(f"gh pr create failed: {p.stderr.strip()}")
     return p.stdout.strip()
 
 
-def _gh_available() -> bool:
-    p = subprocess.run(["gh", "--version"], capture_output=True, text=True,
-                       timeout=15)
+def _gh_available(*, gh_bin: str | None = None) -> bool:
+    gh = gh_bin or "gh"
+    try:
+        p = subprocess.run([gh, "--version"], capture_output=True, text=True,
+                           timeout=15)
+    except OSError:
+        return False  # missing/unexecutable gh (or an unsearchable PATH)
     return p.returncode == 0
