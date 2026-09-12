@@ -96,3 +96,38 @@ class PlanOut(BaseModel):
     nodes: list[dict] = []
     edges: list[dict] = []
     created_at: str | None = None
+
+
+class RunCreateRequest(BaseModel):
+    requirement: str
+    model: str = "deepseek-v4-pro[1m]"
+    jobs: int = 1
+    sandbox: str = "auto"     # off | auto | on
+    commit: bool = True
+
+
+class RunOut(BaseModel):
+    id: str
+    repository_id: str | None = None
+    plan_id: str | None = None
+    original_run_id: str | None = None
+    requirement_title: str = ""
+    requirement_description: str = ""
+    requirement_kind: str = ""
+    model: str = ""
+    jobs: int = 1
+    sandbox: str = "auto"
+    commit_enabled: bool = True
+    status: str = "queued"
+    cancel_requested: bool = False
+    worktree_task_id: str | None = None
+    error: str | None = None
+    verification: dict | None = None
+    repair: dict | None = None
+    diff: dict | None = None
+    pr_title: str | None = None
+    cost_usd: float = 0.0
+    tokens: int = 0
+    created_at: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None

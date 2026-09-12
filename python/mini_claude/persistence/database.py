@@ -19,10 +19,15 @@ _factories: dict[str, sessionmaker] = {}
 
 def engine_for(db_url: str):
     """One engine per db URL (tests use tmp dbs). The db file's parent
-    directory is created here so a fresh workspace can connect."""
+    directory (the workspace's .repopilot) is created here so a fresh
+    workspace can connect — but only when the workspace root itself
+    exists: the root is the deployment's volume and /ready must be able
+    to report it missing (creating it here made /ready lie 200)."""
     if db_url not in _engines:
         from pathlib import Path
-        Path(db_url).parent.mkdir(parents=True, exist_ok=True)
+        parent = Path(db_url).parent
+        if parent.parent.exists():
+            parent.mkdir(parents=True, exist_ok=True)
         _engines[db_url] = create_engine(
             f"sqlite:///{db_url}", connect_args={"check_same_thread": False})
     return _engines[db_url]
