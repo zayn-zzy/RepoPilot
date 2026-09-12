@@ -3052,3 +3052,80 @@ origin/feat/web-phase-01-application-services
   按 WP2/5/7 各自 Phase 安装。
 - jieba 首次载入向 stderr 打印 "Building prefix dict..."（库自身行为，
   非 Service 打印，如实记录）。
+
+---
+
+# Web Phase 2：FastAPI Foundation
+
+### Goal
+规约 §30：FastAPI app（lifespan/config/db dependency/error handler/
+request-id middleware/CORS//health//ready/OpenAPI），uvicorn 可启动；
+验收 /health 200、/ready 200、/openapi.json 有效。
+
+### Architecture
+```
+mini_claude/api/{main,config,dependencies,errors,middleware} + routers/health
+mini_claude/persistence/database.py（SQLAlchemy 2.0 engine/session，app.db）
+```
+§11 envelope 全程生效；ApplicationError code→HTTP 状态映射（*_NOT_FOUND
+→404 等）；未预期异常 → INTERNAL_ERROR（traceback 只进服务器日志，
+绝不进响应）。workspace root 是部署卷——lifespan 从不创建它，缺失时
+启动降级并由 /ready 如实上报（真实发现并修复：建库副作用曾把缺失的
+workspace 又建出来，导致 /ready 假 200）。
+
+### Added Files
+- `python/mini_claude/api/`（main/config/dependencies/errors/middleware/
+  routers/health）、`python/mini_claude/persistence/database.py`
+- `python/tests/api/test_foundation.py`（9 测试）
+- venv 新增依赖：fastapi 0.141.1、uvicorn 0.52.4、SQLAlchemy 2.0.52
+
+### Modified Files
+无 Core 改动。
+
+### API Contract
+- `GET /health` → 200 {"data":{"status":"ok"},"meta":{"version"},
+  "request_id"}
+- `GET /ready` → 200 ready / 503 {"status":"not_ready","reasons":[...]}
+- envelope + error envelope（§11）；X-Request-ID 透传/生成/回显；CORS
+  白名单；/openapi.json（title=RepoPilot API，version=0.1.0）
+
+### Frontend Pages
+未涉及（WP7 起）。
+
+### Tests
+`tests/api/test_foundation.py`：health/ready envelope、503 诚实原因、
+request-id 生成与透传、CORS 白名单与非白名单、openapi、ApplicationError
+envelope+404 映射、未预期异常 500 且不泄露 traceback/内部细节。
+
+### Test Results
+```
+$ venv/bin/python -m pytest python/tests/api/ -q
+9 passed in 0.92s
+```
+
+### Screenshots
+真实 uvicorn + curl（2026-09-12）：
+```
+$ REPOPILOT_WORKSPACE_ROOT=/tmp/wp2-workspace uvicorn mini_claude.api.main:app --port 8765
+GET /health        → {"data":{"status":"ok"},"meta":{"version":"0.1.0"},"request_id":"605afc7e8232"}
+GET /ready(缺失卷) → 503 {"status":"not_ready","reasons":["workspace root does not exist: ..."]}
+GET /ready(卷就绪) → 200 {"status":"ready"}（app.db 落盘 .repopilot/）
+X-Request-ID: accept-123 透传 ✓；/openapi.json paths: [/health, /ready] ✓
+```
+
+### Git Branch
+feat/web-phase-02-api-foundation
+
+### Commits
+（本 Phase commit）
+
+### Push
+origin/feat/web-phase-02-api-foundation
+
+### Integration
+合并 repopilot-dev。
+
+### Known Issues
+- fastapi/uvicorn/sqlalchemy 已入 venv（本 Phase 依赖）；pytest-asyncio
+  按 WP5 需要时再装。
+- uvicorn 实机验证仅本机 localhost；生产部署形态在 WP12 compose。
