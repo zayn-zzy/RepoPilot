@@ -2970,3 +2970,85 @@ origin/feat/web-phase-00-audit
   UNVERIFIED。
 - 取消机制、approval 等待、行级 run 持久化、事件级 tool_call 落库为
   明确缺口（审计 §3.5），对应 WP5/6 补齐。
+
+---
+
+# Web Phase 1：Application Service 层
+
+### Goal
+规约 §29/§9：抽出 RepositoryService/AskService/PlanningService/RunService/
+GraphService/BenchmarkService——CLI 与（后续）API 共用同一 Use Case；
+Service 不 print、返回结构化结果、Core 异常转 ApplicationError。
+
+### Architecture
+```
+RepoPilot Core（repo/retrieval/planning/agents/execution/product）
+        │
+   application/（新增一级模块：6 个 Service + llm + errors）
+   ┌────┴────┐
+   ▼         ▼
+ CLI       API（WP2 起）
+```
+CLI 的 _cmd_* 全部改为调用 Service（打印逻辑留在 CLI 层）；Shared LLM
+plumbing 从 cli 迁到 application/llm.py（CLI 保留 _llm_base_url 再导出，
+行为兼容）。
+
+### Added Files
+- `python/mini_claude/application/__init__.py`、`errors.py`（ApplicationError
+  code→API envelope）、`llm.py`、`repository.py`、`ask.py`、`planning.py`、
+  `graph.py`、`run.py`、`benchmark.py`
+- `python/tests/application/test_services.py`（14 测试）
+
+### Modified Files
+- `python/mini_claude/product/cli.py`：全部命令改调 Service；打印序列与
+  旧输出逐字一致（17/17 CLI 测试原样通过）
+- `python/mini_claude/repo/store.py`：新增 `counts()`（索引状态的轻量
+  SQL 行计数，不重建对象）
+
+### API Contract
+WP2 的 DTO 基础：PlanResult.nodes/edges（TaskNode 全字段 + budget）、
+AskResult.hits（file/score/sources 如实含各栈分数与 backend label）、
+GraphResult.nodes/links（root/depth/limit，未知 root → MODULE_NOT_FOUND）、
+BenchmarkResult.runs/by_stack（真实行级数据）、IndexStatus（db 元数据+
+行计数）。
+
+### Frontend Pages
+未涉及（WP7 起）。
+
+### Tests
+`tests/application/test_services.py`：init git/非 git、index+status 往返、
+missing path → REPOSITORY_NOT_FOUND、ask 结构化 evidence（无 key 诚实）、
+plan 结构化 nodes/edges（字段集+依赖一致性）、llm 无 key → API_KEY_REQUIRED、
+graph 模块/链接/root+depth+limit/未知 root 报错、benchmark 子集真实指标、
+**RunService 全流程**（脚本化 LLM 驱动真实 DagRunner，纯 Python 调用完成
+一次成功 run + PR body 落盘）。
+
+### Test Results
+```
+$ venv/bin/python -m pytest python/tests/application/ -q
+14 passed in 15.03s
+# CLI 回归：tests/product/test_cli.py 17/17（输出逐字兼容）
+# 全量回归：558/558（回归启动时 13 个服务测试；第 14 个
+# 未知-root 测试在其后加入并单独复跑 14/14；最终状态 559 项）
+```
+
+### Screenshots
+无（CLI/Service 阶段）。
+
+### Git Branch
+feat/web-phase-01-application-services
+
+### Commits
+（本 Phase commit）
+
+### Push
+origin/feat/web-phase-01-application-services
+
+### Integration
+合并 repopilot-dev。
+
+### Known Issues
+- application 是纯 Python 依赖（无新增第三方）；FastAPI/Redis/前端依赖
+  按 WP2/5/7 各自 Phase 安装。
+- jieba 首次载入向 stderr 打印 "Building prefix dict..."（库自身行为，
+  非 Service 打印，如实记录）。

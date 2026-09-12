@@ -138,6 +138,17 @@ class SQLiteStore:
 
     # ─── Read ────────────────────────────────────────────────
 
+    def counts(self) -> dict[str, int]:
+        """Light row counts (no object reconstruction) — the Web
+        RepositoryService's index status uses this."""
+        tables = ("files", "symbols", "imports", "symbol_refs")
+        out: dict[str, int] = {}
+        for table in tables:
+            row = self._conn.execute(
+                f"SELECT COUNT(*) FROM {table}").fetchone()
+            out[table] = int(row[0]) if row else 0
+        return out
+
     def load(self, target_root: str | None = None) -> tuple[str, dict[str, FileRecord], dict[str, list[Symbol]], dict[str, list[ImportInfo]], dict[str, list[Reference]]] | None:
         """Restore the persisted index, or None when the db has no data.
 
@@ -200,4 +211,3 @@ class SQLiteStore:
                 lineno=lineno,
             ))
         return root_path, files, symbols, imports, references
-

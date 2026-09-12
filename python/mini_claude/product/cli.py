@@ -26,7 +26,7 @@ _PYTHON_DIR = Path(__file__).resolve().parents[2]
 if str(_PYTHON_DIR) not in sys.path:
     sys.path.insert(0, str(_PYTHON_DIR))
 
-REPOPILOT_VERSION = "0.1.0"
+from ..application.repository import REPOPILOT_VERSION  # noqa: E402
 
 
 def _load_env_file(path: str | Path = ".env") -> None:
@@ -50,13 +50,11 @@ def _load_env_file(path: str | Path = ".env") -> None:
 
 
 def _llm_base_url() -> str | None:
-    """The Anthropic-compatible base URL. DeepSeek convenience: the bare
-    OpenAI-compatible root (https://api.deepseek.com) returns 404 on the
-    Anthropic protocol — normalize it to the /anthropic endpoint."""
-    url = os.environ.get("ANTHROPIC_BASE_URL") or ""
-    if url.rstrip("/") == "https://api.deepseek.com":
-        return "https://api.deepseek.com/anthropic"
-    return url or None
+    """Re-export of application.llm.llm_base_url (Web Phase 1: the CLI
+    and the services share one implementation — kept under this name
+    for the existing CLI tests)."""
+    from ..application.llm import llm_base_url
+    return llm_base_url()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -210,27 +208,18 @@ def _repopilot_dir(root: Path) -> Path:
 
 
 def _cmd_init(args) -> int:
-    root = Path(args.dir).resolve()
-    _require_git(root)
-    cfg = _repopilot_dir(root)
-    cfg.mkdir(exist_ok=True)
-    config = {
-        "repopilot_version": REPOPILOT_VERSION,
-        "initialized_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-        "root": str(root),
-    }
-    (cfg / "config.json").write_text(json.dumps(config, indent=2))
-    print(f"repopilot initialized: {cfg}")
-    print(f"  config: {cfg / 'config.json'}")
+    from ..application import RepositoryService
+    result = RepositoryService().initialize(args.dir)
+    if not result.ok:
+        raise SystemExit(result.error)
+    print(f"repopilot initialized: {result.config_path.parent}")
+    print(f"  config: {result.config_path}")
     return 0
 
 
 def _cmd_index(args) -> int:
-    from ..repo import RepositoryIndex
-    root = Path(args.dir).resolve()
-    db = _repopilot_dir(root) / "index.db"
-    index = RepositoryIndex(root)
-    result, note = index.load_or_build(db, full=args.full)
+    from ..application import RepositoryService
+    result = RepositoryService().index(args.dir, full=args.full)
     print(f"indexed {result.files} files, {result.symbols} symbols, "
           f"{result.imports} imports, {result.references} references "
           f"({result.elapsed_s:.1f}s)")
@@ -239,74 +228,28 @@ def _cmd_index(args) -> int:
             f"{lang}={n} [{result.parser_kinds.get(lang, '')}]"
             for lang, n in sorted(result.files_by_language.items()))
         print(f"  languages: {langs}")
-    print(f"  index: {note}")
-    print(f"  saved: {db}")
+    print(f"  index: {result.note}")
+    print(f"  saved: {result.db_path}")
     return 0
 
 
 def _cmd_ask(args) -> int:
-    from ..retrieval import HybridRetriever, detect_embedding_backend
-    from ..repo import RepositoryIndex
-    root = Path(args.dir).resolve()
-    index = RepositoryIndex(root)
-    _, index_note = index.load_or_build(_repopilot_dir(root) / "index.db")
-    print(f"(index: {index_note})")
-    backend, note = detect_embedding_backend(prefer=args.semantic)
-    cache = _repopilot_dir(root) / "embeddings-cache.json"
-    retriever = HybridRetriever(index, semantic_backend=backend,
-                                semantic_cache=cache)
-    print(f"(semantic backend: {retriever.semantic_label} — {note})")
-    context = retriever.build_context(args.question, token_budget=3000, top_k=5)
-    print("--- retrieved context ---")
-    print(context[:4000])
+    from ..application import AskService
     api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
-    if not api_key:
+    result = AskService().ask(
+        args.dir, args.question, model=args.model,
+        semantic=args.semantic, api_key=api_key, base_url=_llm_base_url())
+    print(f"(index: {result.index_note})")
+    print(f"(semantic backend: {result.semantic_label} — "
+          f"{result.semantic_note})")
+    print("--- retrieved context ---")
+    print(result.context[:4000])
+    if not result.has_answer:
         print("\n(no ANTHROPIC_API_KEY — showing retrieval context only)")
         return 0
-    from ..runtime import AgentRuntime, AgentConfig, build_default_registry
-    runtime = AgentRuntime(AgentConfig(
-        role="general", model=args.model, api_key=api_key,
-        anthropic_base_url=_llm_base_url(),
-        custom_system_prompt="You answer questions about a code repository "
-                             "using the provided context.",
-    ), registry=build_default_registry())
-    import asyncio
-    answer = asyncio.run(runtime.run(
-        f"Context from the repository:\n{context}\n\nQuestion: {args.question}\n"
-        "Answer concisely, citing file paths."))
     print("\n--- answer ---")
-    print(answer.text)
+    print(result.answer)
     return 0
-
-
-def _make_llm_call(api_key: str, model: str):
-    """The Planner's LLMCall contract: async (system, user) -> text.
-    Uses the Anthropic SDK pointed at the DeepSeek-compatible endpoint
-    (thinking must be disabled on SDK 1.4), with the net.py
-    direct-connection fallback for broken proxies."""
-    import anthropic
-    from ..net import anthropic_create_sync_with_fallback  # noqa: PLC0415
-    base_url = _llm_base_url()
-    client = anthropic.Anthropic(
-        api_key=api_key, base_url=base_url, timeout=120)
-    direct_factory = lambda: anthropic.Anthropic(  # noqa: E731
-        api_key=api_key, base_url=base_url, timeout=120)
-
-    async def llm_call(system: str, user: str) -> str:
-        import asyncio
-        response = await asyncio.to_thread(
-            anthropic_create_sync_with_fallback,
-            client, direct_factory,
-            model=model,
-            max_tokens=2000,
-            thinking={"type": "disabled"},
-            system=system,
-            messages=[{"role": "user", "content": user}],
-        )
-        return "".join(b.text for b in response.content
-                       if getattr(b, "type", "") == "text")
-
-    return llm_call
 
 
 def _print_plan(plan) -> None:
@@ -328,23 +271,21 @@ def _print_plan(plan) -> None:
 
 
 def _cmd_plan(args) -> int:
-    from ..planning import Planner, RequirementParser
-    requirement = RequirementParser().parse(args.requirement)
+    from ..application import PlanningService
+    service = PlanningService()
+    requirement = service.parse(args.requirement)
     print(f"requirement: {requirement.title} (kind={requirement.kind.value})")
     print(f"description: {requirement.description}")
     if requirement.related_files:
         print(f"related files: {requirement.related_files}")
-    if args.llm:
-        api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
-        if not api_key:
-            print("error: --llm needs ANTHROPIC_API_KEY", file=sys.stderr)
-            return 1
-        import asyncio
-        planner = Planner(llm_call=_make_llm_call(api_key, args.model))
-        plan = asyncio.run(planner.plan_with_llm(requirement))
-    else:
-        plan = Planner()._deterministic_plan(requirement)
-    _print_plan(plan)
+    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
+    if args.llm and not api_key:
+        print("error: --llm needs ANTHROPIC_API_KEY", file=sys.stderr)
+        return 1
+    result = service.create_plan(
+        Path(".").resolve(), requirement, llm=args.llm, model=args.model,
+        api_key=api_key, base_url=_llm_base_url())
+    _print_plan(result.plan)
     return 0
 
 
@@ -357,83 +298,45 @@ def _require_key(what: str) -> str | None:
     return key
 
 
-def _make_plan(args, requirement) -> object:
-    """Deterministic or LLM planner — the shared run/issue step."""
-    import asyncio
-    from ..planning import Planner
-    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
-    if args.llm:
-        planner = Planner(llm_call=_make_llm_call(api_key, args.model))
-        return asyncio.run(planner.plan_with_llm(requirement))
-    return Planner()._deterministic_plan(requirement)
-
-
-def _run_planned(root: Path, requirement, args, task_id: str, api_key: str):
-    """Shared run/issue execution: plan → DAG run → report."""
-    import asyncio
-    from ..product.orchestrator import run_dag_requirement
-    plan = _make_plan(args, requirement)
-    _print_plan(plan)
-    report = asyncio.run(run_dag_requirement(
-        root, requirement, plan=plan, task_id=task_id,
-        model=args.model, api_key=api_key,
-        anthropic_base_url=_llm_base_url(),
-        jobs=args.jobs, sandbox=args.sandbox,
-        commit=not getattr(args, "no_commit", False),
-    ))
-    print(report.summarize())
-    return report
-
-
-def _finish_run(root: Path, report, task_id: str, *, push: bool, pr: bool,
-                merge: bool, cleanup: bool, squash: bool) -> int:
-    """The Phase 17 GitHub flow + PR body handling. Without any GitHub
-    flag the behavior is unchanged: PR body written, manual `gh pr
-    create` command printed."""
-    pr_file = None
-    if report.pr is not None:
-        pr_file = _repopilot_dir(root) / f"pr-{task_id}.md"
-        pr_file.write_text(report.pr.body)
-    requested = push or pr or merge or cleanup
-    pr_url = ""
-    if requested:
-        from ..product.github_flow import run_github_flow
-        from ..worktree import WorktreeManager
-        result = run_github_flow(
-            root, report, push=push, pr=pr, merge=merge, cleanup=cleanup,
-            merge_method="squash" if squash else "merge",
-            manager=WorktreeManager(root))
-        print(result.summarize())
-        pr_url = result.pr_url
-    if report.pr is not None and not pr_url:
-        print(f"  PR body: {pr_file}")
-        print(f"  create it with: gh pr create --head {report.pr.head_branch} "
-              f"--base {report.pr.base_branch} --title \"{report.pr.title}\" "
-              f"--body-file {pr_file}")
-    return 0 if report.success else 1
-
-
 def _cmd_run(args) -> int:
-    from ..planning import RequirementParser
+    from ..application import PlanningService, RunService
     root = Path(args.dir).resolve()
     _require_git(root)
     api_key = _require_key("run")
     if api_key is None:
         return 1
-    requirement = RequirementParser().parse(args.requirement)
+    planner = PlanningService()
+    requirement = planner.parse(args.requirement)
     print(f"requirement: {requirement.title} (kind={requirement.kind.value})")
     task_id = args.task_id or f"T{int(time.time()) % 100000}"
-    report = _run_planned(root, requirement, args, task_id, api_key)
-    return _finish_run(root, report, task_id, push=args.push, pr=args.pr,
-                       merge=args.merge, cleanup=args.cleanup,
-                       squash=args.squash)
+    plan = planner.create_plan(
+        root, requirement, llm=args.llm, model=args.model,
+        api_key=api_key, base_url=_llm_base_url()).plan
+    _print_plan(plan)
+    import asyncio
+    result = asyncio.run(RunService().run(
+        root, requirement, plan=plan, task_id=task_id,
+        model=args.model, api_key=api_key, base_url=_llm_base_url(),
+        jobs=args.jobs, sandbox=args.sandbox, commit=not args.no_commit,
+        push=args.push, pr=args.pr, merge=args.merge,
+        cleanup=args.cleanup, squash=args.squash))
+    report = result.report
+    print(report.summarize())
+    if result.github is not None:
+        print(result.github.summarize())
+    if report.pr is not None and not (result.github and result.github.pr_url):
+        print(f"  PR body: {result.pr_file}")
+        print(f"  create it with: gh pr create --head {report.pr.head_branch} "
+              f"--base {report.pr.base_branch} --title \"{report.pr.title}\" "
+              f"--body-file {result.pr_file}")
+    return 0 if result.success else 1
 
 
 def _cmd_issue(args) -> int:
     """GitHub Issue → Requirement → Run → Push → PR — the doc's full
     flow. `gh` fetches the issue (or --json supplies it offline); push
     and PR creation default ON, merge/cleanup are opt-in flags."""
-    from ..planning import RequirementParser
+    from ..application import PlanningService, RunService
     from ..product.github import GhError, fetch_issue, issue_to_requirement
     root = Path(args.dir).resolve()
     _require_git(root)
@@ -460,52 +363,55 @@ def _cmd_issue(args) -> int:
     if api_key is None:
         return 1
     task_id = f"I{issue.get('number', 'X')}-T{int(time.time()) % 100000}"
-    report = _run_planned(root, requirement, args, task_id, api_key)
-    return _finish_run(root, report, task_id, push=not args.no_push,
-                       pr=not args.no_pr, merge=args.merge,
-                       cleanup=args.cleanup, squash=args.squash)
+    planner = PlanningService()
+    plan = planner.create_plan(
+        root, requirement, llm=args.llm, model=args.model,
+        api_key=api_key, base_url=_llm_base_url()).plan
+    _print_plan(plan)
+    import asyncio
+    result = asyncio.run(RunService().run(
+        root, requirement, plan=plan, task_id=task_id,
+        model=args.model, api_key=api_key, base_url=_llm_base_url(),
+        jobs=args.jobs, sandbox=args.sandbox, commit=True,
+        push=not args.no_push, pr=not args.no_pr, merge=args.merge,
+        cleanup=args.cleanup, squash=args.squash))
+    report = result.report
+    print(report.summarize())
+    if result.github is not None:
+        print(result.github.summarize())
+    if report.pr is not None and not (result.github and result.github.pr_url):
+        print(f"  PR body: {result.pr_file}")
+        print(f"  create it with: gh pr create --head {report.pr.head_branch} "
+              f"--base {report.pr.base_branch} --title \"{report.pr.title}\" "
+              f"--body-file {result.pr_file}")
+    return 0 if result.success else 1
 
 
 def _cmd_graph(args) -> int:
-    from ..repo import RepositoryIndex
-    root = Path(args.dir).resolve()
-    index = RepositoryIndex(root)
-    _, index_note = index.load_or_build(_repopilot_dir(root) / "index.db")
-    print(f"(index: {index_note})")
-    graph = index.graph
-    modules = graph.modules()
-    edges = sum(len(index.module_dependencies(m)) for m in modules)
-    print(f"modules: {len(modules)}  edges: {edges}")
-    for module in modules:
-        deps = index.module_dependencies(module)
+    from ..application import GraphService
+    result = GraphService().graph(args.dir)
+    print(f"(index: {result.index_note})")
+    print(f"modules: {len(result.modules)}  edges: {result.edges}")
+    for module in result.modules:
+        deps = result.dependencies.get(module, [])
         if deps:
             print(f"  {module} -> {', '.join(deps)}")
     return 0
 
 
 def _cmd_benchmark(args) -> int:
-    import tempfile
-    from ..evaluation import TASK_SPECS, aggregate, build_task_repos, retrieval_eval
-    from ..retrieval import detect_embedding_backend
-    with tempfile.TemporaryDirectory() as tmp:
-        tasks = build_task_repos(Path(tmp))
-        backend, note = detect_embedding_backend(prefer=args.semantic)
-        print(f"(semantic backend: {backend.label} — {note})")
-        runs = retrieval_eval(tasks, semantic_backend=backend)
-        out = Path(args.out) if args.out else _repopilot_dir(Path(".").resolve()) / "benchmark"
-        out.mkdir(parents=True, exist_ok=True)
-        raw = out / "retrieval_results.json"
-        raw.write_text(json.dumps([r.to_dict() for r in runs], indent=2))
-        print("retrieval benchmark (real runs, 24 tasks × 5 stacks):")
-        by_stack = {}
-        for r in runs:
-            by_stack.setdefault(r.baseline, []).append(r)
-        for stack, rs in sorted(by_stack.items()):
-            a = aggregate(rs)
-            print(f"  {stack:32} recall@5={a['recall@5']:.3f} "
-                  f"recall@10={a['recall@10']:.3f} MRR={a['mrr']:.3f} "
-                  f"topk_hit@5={a['topk_hit@5']:.3f}")
-        print(f"raw results: {raw}")
+    from ..application import BenchmarkService
+    out = Path(args.out) if args.out else _repopilot_dir(Path(".").resolve()) / "benchmark"
+    result = BenchmarkService().run_retrieval_benchmark(
+        semantic=args.semantic, out_dir=out)
+    print(f"(semantic backend: {result.semantic_label} — "
+          f"{result.semantic_note})")
+    print("retrieval benchmark (real runs, 24 tasks × 5 stacks):")
+    for stack, a in sorted(result.by_stack.items()):
+        print(f"  {stack:32} recall@5={a['recall@5']:.3f} "
+              f"recall@10={a['recall@10']:.3f} MRR={a['mrr']:.3f} "
+              f"topk_hit@5={a['topk_hit@5']:.3f}")
+    print(f"raw results: {result.raw_path}")
     return 0
 
 
