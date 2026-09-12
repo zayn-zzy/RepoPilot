@@ -5,10 +5,10 @@
 
 ## Project Status
 
-Current Phase: Phase 10（Productization）
-Overall Status: IN_PROGRESS
+Current Phase: Phase 17（GitHub 流程产品化）— 全量完成
+Overall Status: COMPLETED（用户评审 8 项差距全部修复；最终 Definition of Done §28 逐项核对见 FINAL_ASSESSMENT.md）
 Integration Branch: repopilot-dev
-Last Updated: 2026-09-07
+Last Updated: 2026-09-12
 
 | Phase | Module | Branch | Status | Tests | Remote Push |
 |------|------|------|------|------|------|
@@ -23,6 +23,14 @@ Last Updated: 2026-09-07
 | 8 | Docker Sandbox + Security | feat/phase-08-sandbox-security | COMPLETED | 392/392 PASS | PASS |
 | 9 | Evaluation + Benchmark | feat/phase-09-evaluation | COMPLETED | 406/406 PASS | PASS |
 | 10 | Productization | feat/phase-10-productization | COMPLETED | 425/425 PASS | PASS |
+| 11 | Task DAG 接入 run | feat/phase-11-dag-run | COMPLETED | 459/459 PASS | PASS |
+| 12 | Docker 接入命令执行 | feat/phase-12-docker-wiring | COMPLETED | 481/481 PASS | PASS |
+| 13 | 多语言 + 调用图 | feat/phase-13-multilang | COMPLETED | 492/492 PASS | PASS |
+| 14 | 神经语义检索 | feat/phase-14-neural-semantic | COMPLETED | 504/504 PASS | PASS |
+| 15 | 中文检索 | feat/phase-15-chinese-retrieval | COMPLETED | 516/516 PASS | PASS |
+| 16 | 索引持久化复用 | feat/phase-16-index-load-reuse | COMPLETED | 532/532 PASS | PASS |
+| 17 | GitHub 流程产品化 | feat/phase-17-github-flow | COMPLETED | 545/545 PASS | PASS |
+| — | plan --llm 修复 | fix/plan-llm-cli | COMPLETED | 并入 11 | PASS |
 
 ---
 
